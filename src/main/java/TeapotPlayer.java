@@ -101,6 +101,7 @@ public class TeapotPlayer extends StateMachineGamer {
 			int result = maxscore_minimax(role, newState);
 
 			// make sure we only get the minimum score
+			//if (result == 0) return 0;
 			if (result < score) score = result;
 		}
 
@@ -117,6 +118,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		int score = 0;
 		for (int i = 0; i < actions.size(); i++) {
 			int result = minscore_minimax(role, actions.get(i), state);
+			//if(result == 100) return 100;
 			if(result > score) score = result;
 		}
 		return score;
