@@ -1,11 +1,13 @@
+import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 
 import org.ggp.base.apps.player.Player;
 import org.ggp.base.player.gamer.exception.GamePreviewException;
 import org.ggp.base.player.gamer.statemachine.StateMachineGamer;
 import org.ggp.base.util.game.Game;
+import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
+import org.ggp.base.util.statemachine.Role;
 import org.ggp.base.util.statemachine.StateMachine;
 import org.ggp.base.util.statemachine.cache.CachedStateMachine;
 import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
@@ -37,9 +39,53 @@ public class TeapotPlayer extends StateMachineGamer {
 		// TODO Auto-generated method stub
 
 		StateMachine machine = getStateMachine();
-		List<Move> moves = machine.getLegalMoves(getCurrentState(), getRole());
+		Role role = getRole();
+		MachineState state = getCurrentState();
 
-		return moves.get((new Random()).nextInt(moves.size()));
+		//We update to the current state of the game and get the next legal moves
+		List<Move> actions = machine.getLegalMoves(state, role);
+
+		//Get the first possible legal move
+		Move action = actions.get(0);
+		int score = 0;
+
+		//Go through each of the possible legal moves
+		for (int i=0; i<actions.size(); i++){
+
+			//Get the result that gives the maximum score after going through the game tree
+			int result = maxscore(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
+
+			//If our result is 100, then we cannot do any better
+			if (result==100){
+				return actions.get(i);
+			}
+
+			//Score should track the best result so far
+			if (result>score){
+				score = result;
+				action = actions.get(i);
+
+			}
+		}
+
+		return action;
+	}
+
+
+
+	private int maxscore(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
+		StateMachine machine = getStateMachine();
+		// Base Case
+		if (machine.isTerminal(state)) {
+			return machine.getGoal(state, role);
+		}
+		List<Move> actions = machine.getLegalMoves(state, role);
+		int score = 0;
+		for (int i = 0; i < actions.size(); i++) {
+			int result = maxscore(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
+			if(result>score) score = result;
+		}
+		return score;
 	}
 
 	@Override
