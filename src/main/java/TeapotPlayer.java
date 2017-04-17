@@ -53,27 +53,61 @@ public class TeapotPlayer extends StateMachineGamer {
 		for (int i=0; i<actions.size(); i++){
 
 			//Get the result that gives the maximum score after going through the game tree
-			int result = maxscore(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
+			int result = minscore_minimax(role, actions.get(i), state);
 
 			//If our result is 100, then we cannot do any better
-			if (result==100){
+			/*if (result==100){
 				return actions.get(i);
-			}
+			}*/
 
 			//Score should track the best result so far
-			if (result>score){
+			if (result > score){
 				score = result;
 				action = actions.get(i);
-
 			}
 		}
 
 		return action;
 	}
 
+	private int minscore_minimax(Role role, Move action, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
+		StateMachine machine = getStateMachine();
+		List<Role> roles = machine.getRoles();
 
+		// get the opponent
+		Role opponent = (role == roles.get(0)) ? roles.get(1) : roles.get(0);
+		List<Move> actions = machine.getLegalMoves(state, opponent);
+		int score = 100;
 
-	private int maxscore(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
+		if (machine.isTerminal(state)) {
+			return machine.getGoal(state, role);
+		}
+
+		// Loop through all actions
+		for (Move a : actions) {
+			List<Move> toMove = null;
+
+			// Make sure we perform the moves in the right order
+			if (role == roles.get(0)) {
+				toMove = Arrays.asList(action, a);
+			} else {
+				toMove = Arrays.asList(a, action);
+			}
+
+			// get the new state we're going to be on
+			MachineState newState = machine.getNextState(state, toMove);
+
+			// and... recurse and do this all over again
+			int result = maxscore_minimax(role, newState);
+
+			// make sure we only get the minimum score
+			if (result < score) score = result;
+		}
+
+		return score;
+	}
+
+	private int maxscore_minimax(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
 		StateMachine machine = getStateMachine();
 		// Base Case
 		if (machine.isTerminal(state)) {
@@ -82,11 +116,28 @@ public class TeapotPlayer extends StateMachineGamer {
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
 		for (int i = 0; i < actions.size(); i++) {
-			int result = maxscore(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
+			int result = minscore_minimax(role, actions.get(i), state);
+			if(result > score) score = result;
+		}
+		return score;
+	}
+
+/* maxscore for complusive :D
+	private int maxscore_complusive(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
+		StateMachine machine = getStateMachine();
+		// Base Case
+		if (machine.isTerminal(state)) {
+			return machine.getGoal(state, role);
+		}
+		List<Move> actions = machine.getLegalMoves(state, role);
+		int score = 0;
+		for (int i = 0; i < actions.size(); i++) {
+			int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
 			if(result>score) score = result;
 		}
 		return score;
 	}
+*/
 
 	@Override
 	public void stateMachineStop() {
