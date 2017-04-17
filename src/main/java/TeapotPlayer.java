@@ -16,6 +16,7 @@ import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 public class TeapotPlayer extends StateMachineGamer {
 
 	Player p;
+	// This is Nidhi
 
 	@Override
 	public StateMachine getInitialStateMachine() {
