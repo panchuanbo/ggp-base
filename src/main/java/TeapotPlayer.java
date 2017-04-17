@@ -41,6 +41,8 @@ public class TeapotPlayer extends StateMachineGamer {
 		StateMachine machine = getStateMachine();
 		Role role = getRole();
 		MachineState state = getCurrentState();
+		// System.out.println(state.getContents());
+		// System.out.println(machine.getLegalJointMoves(state));
 
 		//We update to the current state of the game and get the next legal moves
 		List<Move> actions = machine.getLegalMoves(state, role);
@@ -50,7 +52,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		int score = 0;
 
 		//Go through each of the possible legal moves
-		for (int i=0; i<actions.size(); i++){
+		for (int i=0; i < actions.size(); i++){
 
 			//Get the result that gives the maximum score after going through the game tree
 			int result = minscore_minimax(role, actions.get(i), state);
@@ -60,12 +62,15 @@ public class TeapotPlayer extends StateMachineGamer {
 				return actions.get(i);
 			}*/
 
+			// System.out.println(actions.get(i) + " " + result);
+
 			//Score should track the best result so far
 			if (result > score){
 				score = result;
 				action = actions.get(i);
 			}
 		}
+		// System.out.println();
 
 		return action;
 	}
@@ -75,20 +80,22 @@ public class TeapotPlayer extends StateMachineGamer {
 		List<Role> roles = machine.getRoles();
 
 		// get the opponent
-		Role opponent = (role == roles.get(0)) ? roles.get(1) : roles.get(0);
+		Role opponent = (role.equals(roles.get(0))) ? roles.get(1) : roles.get(0);
+		// System.out.println(role.equals(opponent));
 		List<Move> actions = machine.getLegalMoves(state, opponent);
+
 		int score = 100;
 
-		if (machine.isTerminal(state)) {
-			return machine.getGoal(state, role);
-		}
+//		if (machine.isTerminal(state)) {
+//			return machine.getGoal(state, role);
+//		}
 
 		// Loop through all actions
 		for (Move a : actions) {
 			List<Move> toMove = null;
 
 			// Make sure we perform the moves in the right order
-			if (role == roles.get(0)) {
+			if (role.equals(roles.get(0))) {
 				toMove = Arrays.asList(action, a);
 			} else {
 				toMove = Arrays.asList(a, action);
@@ -96,6 +103,7 @@ public class TeapotPlayer extends StateMachineGamer {
 
 			// get the new state we're going to be on
 			MachineState newState = machine.getNextState(state, toMove);
+			// System.out.println("Actions: " + actions);
 
 			// and... recurse and do this all over again
 			int result = maxscore_minimax(role, newState);
@@ -112,6 +120,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		StateMachine machine = getStateMachine();
 		// Base Case
 		if (machine.isTerminal(state)) {
+			// System.out.println(machine.getGoal(state, role));
 			return machine.getGoal(state, role);
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
