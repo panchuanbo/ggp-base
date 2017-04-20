@@ -41,10 +41,72 @@ public class TeapotPlayer extends StateMachineGamer {
 		// TODO Auto-generated method stub
 
 		StateMachine machine = getStateMachine();
+		List<Role> roles = machine.getRoles();
+
+		if (roles.size() == 1) { // Use Complusive
+			return selectMoveSinglePlayer(timeout);
+		} else { // Use alpha-beta (current 2p, upgrade to multi)
+			return selectMoveMultiPlayer(timeout);
+		}
+	}
+
+	// MARK - Single Player (complusive)
+
+	private Move selectMoveSinglePlayer(long timeout) throws MoveDefinitionException, GoalDefinitionException, TransitionDefinitionException {
+		StateMachine machine = getStateMachine();
 		Role role = getRole();
 		MachineState state = getCurrentState();
-		// System.out.println(state.getContents());
-		// System.out.println(machine.getLegalJointMoves(state));
+
+		//We update to the current state of the game and get the next legal moves
+		List<Move> actions = machine.getLegalMoves(state, role);
+
+		//Get the first possible legal move
+		Move action = actions.get(0);
+		int score = 0;
+
+		//Go through each of the possible legal moves
+		for (int i=0; i<actions.size(); i++){
+
+			//Get the result that gives the maximum score after going through the game tree
+			int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
+
+			//If our result is 100, then we cannot do any better
+			if (result==100){
+				return actions.get(i);
+			}
+
+			//Score should track the best result so far
+			if (result > score){
+				score = result;
+				action = actions.get(i);
+			}
+		}
+
+		return action;
+	}
+
+	private int maxscore_complusive(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
+		StateMachine machine = getStateMachine();
+		// Base Case
+		if (machine.isTerminal(state)) {
+			return machine.getGoal(state, role);
+		}
+		List<Move> actions = machine.getLegalMoves(state, role);
+		int score = 0;
+		for (int i = 0; i < actions.size(); i++) {
+			int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
+			if(result>score) score = result;
+		}
+		return score;
+	}
+
+	// MARK - Multiplayer (minimax)
+
+	private Move selectMoveMultiPlayer(long timeout) throws MoveDefinitionException, GoalDefinitionException, TransitionDefinitionException {
+		StateMachine machine = getStateMachine();
+
+		Role role = getRole();
+		MachineState state = getCurrentState();
 
 		//We update to the current state of the game and get the next legal moves
 		List<Move> actions = machine.getLegalMoves(state, role);
@@ -64,11 +126,7 @@ public class TeapotPlayer extends StateMachineGamer {
 			int result = minscore_ab(role, actions.get(i), state, alpha, beta);
 
 			//If our result is 100, then we cannot do any better
-			/*if (result==100){
-				return actions.get(i);
-			}*/
-
-			// System.out.println(actions.get(i) + " " + result);
+			if (result==100) return actions.get(i);
 
 			//Score should track the best result so far
 			if (result > score){
@@ -76,7 +134,6 @@ public class TeapotPlayer extends StateMachineGamer {
 				action = actions.get(i);
 			}
 		}
-		// System.out.println();
 
 		return action;
 	}
@@ -140,10 +197,6 @@ public class TeapotPlayer extends StateMachineGamer {
 
 		int score = 100;
 
-//		if (machine.isTerminal(state)) {
-//			return machine.getGoal(state, role);
-//		}
-
 		// Loop through all actions
 		for (Move a : actions) {
 			List<Move> toMove = null;
@@ -187,22 +240,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		return score;
 	}
 
-/* maxscore for complusive :D
-	private int maxscore_complusive(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
-		StateMachine machine = getStateMachine();
-		// Base Case
-		if (machine.isTerminal(state)) {
-			return machine.getGoal(state, role);
-		}
-		List<Move> actions = machine.getLegalMoves(state, role);
-		int score = 0;
-		for (int i = 0; i < actions.size(); i++) {
-			int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
-			if(result>score) score = result;
-		}
-		return score;
-	}
-*/
+	// Move overridden stuff
 
 	@Override
 	public void stateMachineStop() {

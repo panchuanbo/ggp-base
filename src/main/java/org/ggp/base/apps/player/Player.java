@@ -89,7 +89,7 @@ public final class Player extends JPanel
 		java.util.Collections.sort(gamers, new Comparator<Class<? extends Gamer>>() {
 			@Override
 			public int compare(Class<? extends Gamer> left, Class<? extends Gamer> right) {
-				return left.getSimpleName().compareTo(right.getSimpleName());
+				return right.getSimpleName().compareTo(left.getSimpleName());
 			}
 		});
 
