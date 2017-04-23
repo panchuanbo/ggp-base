@@ -18,6 +18,8 @@ import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 public class TeapotPlayer extends StateMachineGamer {
 
 	Player p;
+	int limitSinglePlayer = 5;
+	int limitMultiPlayer = 2;
 	// This is Nidhi
 
 	@Override
@@ -30,11 +32,8 @@ public class TeapotPlayer extends StateMachineGamer {
 	public void stateMachineMetaGame(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		// TODO Auto-generated method stub
-
 	}
 
-	//NOTE: Need to change calls to minscore and maxscore so that we pass in alpha and beta
-	//alpha initially 0 and beta initially 100
 	@Override
 	public Move stateMachineSelectMove(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
@@ -50,8 +49,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		}
 	}
 
-	// MARK - Single Player (complusive)
-
+	// MARK - Single Player (compulsive)
 	private Move selectMoveSinglePlayer(long timeout) throws MoveDefinitionException, GoalDefinitionException, TransitionDefinitionException {
 		StateMachine machine = getStateMachine();
 		Role role = getRole();
@@ -68,7 +66,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		for (int i=0; i<actions.size(); i++){
 
 			//Get the result that gives the maximum score after going through the game tree
-			int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
+			int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(actions.get(i))), 0);
 
 			//If our result is 100, then we cannot do any better
 			if (result==100){
@@ -85,23 +83,27 @@ public class TeapotPlayer extends StateMachineGamer {
 		return action;
 	}
 
-	private int maxscore_complusive(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
+	private int maxscore_complusive(Role role, MachineState state, int level) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
 		StateMachine machine = getStateMachine();
 		// Base Case
 		if (machine.isTerminal(state)) {
 			return machine.getGoal(state, role);
 		}
+		if (level >= limitSinglePlayer) {
+			return evalFuncMobility(role, state);
+		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
 		for (int i = 0; i < actions.size(); i++) {
-			int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(actions.get(i))));
+			int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(actions.get(i))), level+1);
 			if(result>score) score = result;
 		}
 		return score;
 	}
 
-	// MARK - Multiplayer (minimax)
-
+	// MARK - Multiplayer (alpha beta)
+	//NOTE: Need to change calls to minscore and maxscore so that we pass in alpha and beta
+		//alpha initially 0 and beta initially 100
 	private Move selectMoveMultiPlayer(long timeout) throws MoveDefinitionException, GoalDefinitionException, TransitionDefinitionException {
 		StateMachine machine = getStateMachine();
 
@@ -123,7 +125,11 @@ public class TeapotPlayer extends StateMachineGamer {
 		for (int i=0; i < actions.size(); i++){
 
 			//Get the result that gives the maximum score after going through the game tree
-			int result = minscore_ab(role, actions.get(i), state, alpha, beta);
+			// Use alpha beta
+			//int result = minscore_ab(role, actions.get(i), state, alpha, beta);
+
+			// Use bounded minimax with fixed Depth heuristic
+			int result = minscore_minimax_fixedDepth(role, actions.get(i), state, 0);
 
 			//If our result is 100, then we cannot do any better
 			if (result==100) return actions.get(i);
@@ -150,24 +156,20 @@ public class TeapotPlayer extends StateMachineGamer {
 		// Loop through all actions
 		for (Move a : actions) {
 			List<Move> toMove = null;
-
 			// Make sure we perform the moves in the right order
 			if (role.equals(roles.get(0))) {
 				toMove = Arrays.asList(action, a);
 			} else {
 				toMove = Arrays.asList(a, action);
 			}
-
 			// get the new state we're going to be on
 			MachineState newState = machine.getNextState(state, toMove);
 			// System.out.println("Actions: " + actions);
-
 			// and... recurse and do this all over again
 			int result = maxscore_ab(role, newState, alpha, beta);
 			beta = Math.min(beta, result);
 			if (beta <= alpha) return alpha;
 		}
-
 		return beta;
 	}
 
@@ -186,7 +188,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		return alpha;
 	}
 
-	private int minscore_minimax(Role role, Move action, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
+	private int minscore_minimax_fixedDepth(Role role, Move action, MachineState state, int level) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
 		StateMachine machine = getStateMachine();
 		List<Role> roles = machine.getRoles();
 
@@ -211,36 +213,52 @@ public class TeapotPlayer extends StateMachineGamer {
 			// get the new state we're going to be on
 			MachineState newState = machine.getNextState(state, toMove);
 			// System.out.println("Actions: " + actions);
-
 			// and... recurse and do this all over again
-			int result = maxscore_minimax(role, newState);
+			int result = maxscore_minimax_fixedDepth(role, newState, level + 1);
 
 			// make sure we only get the minimum score
-			//if (result == 0) return 0;
+			if (result == 0) return 0;
 			if (result < score) score = result;
 		}
-
 		return score;
 	}
 
-	private int maxscore_minimax(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
+	private int maxscore_minimax_fixedDepth(Role role, MachineState state, int level) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
 		StateMachine machine = getStateMachine();
 		// Base Case
+		// If we reach a terminal state then ust return the reward/goal of the state
 		if (machine.isTerminal(state)) {
 			// System.out.println(machine.getGoal(state, role));
 			return machine.getGoal(state, role);
 		}
+		//If we reach a non-terminal state but have the limit level, do an evaluation function heuristic
+		if (level >= limitMultiPlayer) {
+			return evalFuncMobility(role, state);
+		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
 		for (int i = 0; i < actions.size(); i++) {
-			int result = minscore_minimax(role, actions.get(i), state);
-			//if(result == 100) return 100;
+			int result = minscore_minimax_fixedDepth(role, actions.get(i), state, level);
+			if(result == 100) return 100;
 			if(result > score) score = result;
 		}
 		return score;
 	}
 
-	// Move overridden stuff
+	private int evalFuncMobility(Role role, MachineState state) throws MoveDefinitionException {
+		StateMachine machine = getStateMachine();
+
+		//We update to the current state of the game and get the next legal moves
+		List<Move> actions = machine.getLegalMoves(state, role);
+		List<Move> feasibles = machine.findActions(role);
+
+		return 0;
+	}
+
+	private int evalFuncBasic(Role role, MachineState state) {
+		return 0;
+	}
+
 
 	@Override
 	public void stateMachineStop() {
