@@ -18,8 +18,9 @@ import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 public class TeapotPlayer extends StateMachineGamer {
 
 	Player p;
-	int limitSinglePlayer = 5;
+	int limitSinglePlayer = 10;
 	int limitMultiPlayer = 2;
+	int  nthStepMobilityConst = 2;
 	// This is Nidhi
 
 	@Override
@@ -90,7 +91,7 @@ public class TeapotPlayer extends StateMachineGamer {
 			return machine.getGoal(state, role);
 		}
 		if (level >= limitSinglePlayer) {
-			return evalFuncMobility(role, state);
+			return evalFuncMobilityNStep(role, state);
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
@@ -226,14 +227,14 @@ public class TeapotPlayer extends StateMachineGamer {
 	private int maxscore_minimax_fixedDepth(Role role, MachineState state, int level) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
 		StateMachine machine = getStateMachine();
 		// Base Case
-		// If we reach a terminal state then ust return the reward/goal of the state
+		// If we reach a terminal state then just return the reward/goal of the state
 		if (machine.isTerminal(state)) {
 			// System.out.println(machine.getGoal(state, role));
 			return machine.getGoal(state, role);
 		}
 		//If we reach a non-terminal state but have the limit level, do an evaluation function heuristic
 		if (level >= limitMultiPlayer) {
-			return evalFuncMobility(role, state);
+			return evalFuncFocus(role, state);
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
@@ -245,14 +246,70 @@ public class TeapotPlayer extends StateMachineGamer {
 		return score;
 	}
 
-	private int evalFuncMobility(Role role, MachineState state) throws MoveDefinitionException {
+	private int evalFuncMobilityOneStep(Role role, MachineState state) throws MoveDefinitionException {
 		StateMachine machine = getStateMachine();
 
 		//We update to the current state of the game and get the next legal moves
 		List<Move> actions = machine.getLegalMoves(state, role);
 		List<Move> feasibles = machine.findActions(role);
 
-		return 0;
+		return (int)((double)actions.size()/feasibles.size() * 100);
+	}
+
+
+	private int evalFuncMobilityNStepHelper(Role role, MachineState state, int xthStep) throws MoveDefinitionException, TransitionDefinitionException{
+		StateMachine machine = getStateMachine();
+		List<Role> roles = machine.getRoles();
+		int sumMobility = 0;
+
+		List<Move> actions = machine.getLegalMoves(state, role);
+		if (machine.isTerminal(state)) {
+			return 0; // No valid legal moves
+		}
+		if (xthStep >= nthStepMobilityConst) {
+			return actions.size();
+		}
+		for (Move a: actions) {
+			List<Move> toMove = null;
+			// Make sure we perform the moves in the right order
+
+			/*
+			// ASSUME THERE IS ONLY ONE PLAYER!!!!!!!!!!!!!!!
+			if (role.equals(roles.get(0))) {
+				toMove = Arrays.asList(action, a);
+			} else {
+				toMove = Arrays.asList(a, action);
+			}
+			*/
+
+			// get the new state we're going to be on
+			MachineState newState = machine.getNextState(state, Arrays.asList(a));
+			sumMobility += evalFuncMobilityNStepHelper(role, state, xthStep + 1);
+		}
+
+		return sumMobility;
+	}
+
+	private int evalFuncMobilityNStep(Role role, MachineState state) throws MoveDefinitionException, TransitionDefinitionException {
+		StateMachine machine = getStateMachine();
+		// Call helper method to find number of legal moves in nth step
+		int legalActions = evalFuncMobilityNStepHelper(role, state, 0);
+
+		// Once we reach the nth step level then find the mobility (number of steps that can be made in that state)
+
+		List<Move> feasibles = machine.findActions(role);
+
+		return (int)((double)legalActions/feasibles.size() * 100);
+	}
+
+	private int evalFuncFocus(Role role, MachineState state) throws MoveDefinitionException {
+		StateMachine machine = getStateMachine();
+
+		//We update to the current state of the game and get the next legal moves
+		List<Move> actions = machine.getLegalMoves(state, role);
+		List<Move> feasibles = machine.findActions(role);
+
+		return (int)(100-(double)actions.size()/feasibles.size() * 100);
 	}
 
 	private int evalFuncBasic(Role role, MachineState state) {
