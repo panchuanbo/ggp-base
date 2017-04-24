@@ -91,7 +91,7 @@ public class TeapotPlayer extends StateMachineGamer {
 			return machine.getGoal(state, role);
 		}
 		if (level >= limitSinglePlayer) {
-			return evalFuncMobilityNStep(role, state);
+			return (int) ( (0.25 * evalFuncGoal(role, state)) + (0.5 * evalFuncMobilityNStep(role, state)) + (0.25 * evalFuncMobilityOneStep(role, state)) );
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
@@ -226,15 +226,27 @@ public class TeapotPlayer extends StateMachineGamer {
 
 	private int maxscore_minimax_fixedDepth(Role role, MachineState state, int level) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException{
 		StateMachine machine = getStateMachine();
+		List<Role> roles = machine.getRoles();
+
+		// get the opponent
+		Role opponent = (role.equals(roles.get(0))) ? roles.get(1) : roles.get(0);
+
 		// Base Case
 		// If we reach a terminal state then just return the reward/goal of the state
 		if (machine.isTerminal(state)) {
 			// System.out.println(machine.getGoal(state, role));
 			return machine.getGoal(state, role);
 		}
+		//ASSIGN 3 NUMBER 4: OPPONENT FOCUS HEURISTIC
+		//Could also do opponent mobility
+		//Assuming that opponent eval func replaces our own eval func, so have to delete number 3
+		/*if (level >= limitMultiPlayer) {
+			return evalFuncFocus(opponent, state);
+		}*/
+
 		//If we reach a non-terminal state but have the limit level, do an evaluation function heuristic
 		if (level >= limitMultiPlayer) {
-			return evalFuncFocus(role, state);
+			return (int) ( (0.45 * evalFuncGoal(role, state)) + (0.45 * evalFuncMobilityOneStep(role, state)) + (0.10 * evalFuncFocus(opponent, state)) );
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
@@ -244,6 +256,11 @@ public class TeapotPlayer extends StateMachineGamer {
 			if(result > score) score = result;
 		}
 		return score;
+	}
+
+	private int evalFuncGoal(Role role, MachineState state) throws MoveDefinitionException, GoalDefinitionException {
+		StateMachine machine = getStateMachine();
+		return machine.getGoal(state, role);
 	}
 
 	private int evalFuncMobilityOneStep(Role role, MachineState state) throws MoveDefinitionException {
