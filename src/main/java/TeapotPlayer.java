@@ -21,12 +21,17 @@ public class TeapotPlayer extends StateMachineGamer {
 	Player p;
 
 	// Constants
-	private final static int SINGLE_PLAYER_LIMIT = 10;
-	private final static int MULTI_PLAYER_LIMIT = 2;
 	private final static int NTH_STEP_MOBILITY_LIMIT = 2;
 	private final static int TIMEOUT_BUFFER = 1000; // 1000ms = 1s
 
+	// Stores the timeout (given timeout - buffer)
 	long timeout;
+
+	// Stores all the weights that we'll be using
+	int[] weights = new int[3];
+
+	// Stores the current limit for iterative deepening
+	int limit = 0;
 
 	@Override
 	public StateMachine getInitialStateMachine() {
@@ -37,7 +42,38 @@ public class TeapotPlayer extends StateMachineGamer {
 	@Override
 	public void stateMachineMetaGame(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
-		// TODO Auto-generated method stub
+		// TODO - Uncomment + Finish
+		// Simulate games to learn more about what's happening/how to play
+
+//		StateMachine machine = getStateMachine();
+//		Role role = getRole();
+//		MachineState state = getCurrentState();
+//		int level = 0, gamesSimulated = 0;
+//		int wins = 0, losses = 0, ties = 0;
+//		double ourMobility = 0, ourFocus = 0, ourGoal = 0;
+//		while (System.currentTimeMillis() < timeout - TIMEOUT_BUFFER) {
+//			ourMobility += evalFuncMobilityOneStep(role, state);
+//			ourFocus += evalFuncFocus(role, state);
+//			ourGoal += evalFuncGoal(role, state);
+//			List<Move> actions = machine.getLegalMoves(state, role);
+//			Move randomMove = actions.get((new Random()).nextInt(actions.size()));
+//			List<List<Move>> jointMoves = machine.getLegalJointMoves(state, role, randomMove);
+//			List<Move> randomJointMoves = jointMoves.get((new Random()).nextInt(jointMoves.size()));
+//			level++;
+//			state = machine.getNextState(state, randomJointMoves);
+//			if (machine.isTerminal(state)) {
+//				List<Integer> goals = machine.getGoals(state);
+//				// so find a way to use the goals and other data to understand what's happening
+//				machine = getStateMachine();
+//				role = getRole();
+//				state = getCurrentState();
+//				level = 0;
+//				gamesSimulated++;
+//			}
+//		}
+//
+//		System.out.println("Games Simulated: " + gamesSimulated);
+
 	}
 
 	@Override
@@ -74,20 +110,22 @@ public class TeapotPlayer extends StateMachineGamer {
 		Move bestAction = actions.get(0);
 		int bestScore = 0;
 
-		//Go through each of the possible legal moves
-		for (Move action : actions) {
-			if (reachingTimeout()) break;
+		for (this.limit = 0; !reachingTimeout(); this.limit++) {
+			//Go through each of the possible legal moves
+			for (Move action : actions) {
+				if (reachingTimeout()) break;
 
-			//Get the result that gives the maximum score after going through the game tree
-			int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(action)), 0);
+				//Get the result that gives the maximum score after going through the game tree
+				int result = maxscore_complusive(role, machine.getNextState(state, Arrays.asList(action)), 0);
 
-			//If our result is 100, then we cannot do any better
-			if (result==100) return action;
+				//If our result is 100, then we cannot do any better
+				if (result==100) return action;
 
-			//Score should track the best result so far
-			if (result > bestScore){
-				bestScore = result;
-				bestAction = action;
+				//Score should track the best result so far
+				if (result > bestScore){
+					bestScore = result;
+					bestAction = action;
+				}
 			}
 		}
 
@@ -100,7 +138,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		if (machine.isTerminal(state)) return machine.getGoal(state, role);
 
 		// reached limit or timeout
-		if (level >= SINGLE_PLAYER_LIMIT || reachingTimeout()) {
+		if (level >= this.limit || reachingTimeout()) {
 			return (int) ( (0.25 * evalFuncGoal(role, state)) + (0.5 * evalFuncMobilityNStep(role, state)) + (0.25 * evalFuncMobilityOneStep(role, state)) );
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
@@ -137,24 +175,26 @@ public class TeapotPlayer extends StateMachineGamer {
 		int alpha = 0;
 		int beta = 100;
 
-		//Go through each of the possible legal moves
-		for (Move action : actions) {
-			if (reachingTimeout()) break;
+		for (this.limit = 0; !reachingTimeout(); this.limit++) {
+			//Go through each of the possible legal moves
+			for (Move action : actions) {
+				if (reachingTimeout()) break;
 
-			//Get the result that gives the maximum score after going through the game tree
-			// Use alpha beta
-			//int result = minscore_ab(role, actions.get(i), state, alpha, beta);
+				//Get the result that gives the maximum score after going through the game tree
+				// Use alpha beta
+				//int result = minscore_ab(role, actions.get(i), state, alpha, beta);
 
-			// Use bounded minimax with fixed Depth heuristic
-			int result = minscore_minimax_fixedDepth(role, action, state, 0);
+				// Use bounded minimax with fixed Depth heuristic
+				int result = minscore_minimax_fixedDepth(role, action, state, 0);
 
-			//If our result is 100, then we cannot do any better
-			if (result == 100) return action;
+				//If our result is 100, then we cannot do any better
+				if (result == 100) return action;
 
-			//Score should track the best result so far
-			if (result > bestScore){
-				bestScore = result;
-				bestAction = action;
+				//Score should track the best result so far
+				if (result > bestScore){
+					bestScore = result;
+					bestAction = action;
+				}
 			}
 		}
 
@@ -239,8 +279,10 @@ public class TeapotPlayer extends StateMachineGamer {
 			return evalFuncFocus(opponent, state);
 		}*/
 
+		System.out.println("On Level " + level + " with limit " + this.limit + ".");
+
 		//If we reach a non-terminal state but have the limit level or timeout, do an evaluation function heuristic
-		if (level >= MULTI_PLAYER_LIMIT || reachingTimeout()) {
+		if (level >= this.limit || reachingTimeout()) {
 			return (int) ( (0.45 * evalFuncGoal(role, state)) + (0.45 * evalFuncMobilityOneStep(role, state)) + (0.10 * evalFuncFocus(opponent, state)) );
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
