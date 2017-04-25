@@ -22,7 +22,7 @@ public class TeapotPlayer extends StateMachineGamer {
 
 	// Constants
 	private final static int NTH_STEP_MOBILITY_LIMIT = 2;
-	private final static int TIMEOUT_BUFFER = 1000; // 1000ms = 1s
+	private final static int TIMEOUT_BUFFER = 2500; // 2500ms = 2.5s
 
 	// Stores the timeout (given timeout - buffer)
 	long timeout;
@@ -138,6 +138,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		if (machine.isTerminal(state)) return machine.getGoal(state, role);
 
 		// reached limit or timeout
+		// This used to be the arbitrary Single player limit but now we do iterative deepening
 		if (level >= this.limit || reachingTimeout()) {
 			return (int) ( (0.25 * evalFuncGoal(role, state)) + (0.5 * evalFuncMobilityNStep(role, state)) + (0.25 * evalFuncMobilityOneStep(role, state)) );
 		}
@@ -282,6 +283,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		System.out.println("On Level " + level + " with limit " + this.limit + ".");
 
 		//If we reach a non-terminal state but have the limit level or timeout, do an evaluation function heuristic
+		// This used to be the arbitrary Multi player limit but now we do iterative deepening
 		if (level >= this.limit || reachingTimeout()) {
 			return (int) ( (0.45 * evalFuncGoal(role, state)) + (0.45 * evalFuncMobilityOneStep(role, state)) + (0.10 * evalFuncFocus(opponent, state)) );
 		}
