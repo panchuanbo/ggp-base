@@ -45,7 +45,7 @@ public class TeapotPlayer extends StateMachineGamer {
 
 		if (roles.size() == 1) { // Use Complusive
 			return selectMoveSinglePlayer(timeout);
-		} else { // Use alpha-beta (current 2p, upgrade to multi)
+		} else { // Use alpha-beta
 			return selectMoveMultiPlayer(timeout);
 		}
 	}
@@ -147,24 +147,12 @@ public class TeapotPlayer extends StateMachineGamer {
 
 	private int minscore_ab(Role role, Move action, MachineState state, int alpha, int beta) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
 		StateMachine machine = getStateMachine();
-		List<Role> roles = machine.getRoles();
-
-		// get the opponent
-		Role opponent = (role.equals(roles.get(0))) ? roles.get(1) : roles.get(0);
-		// System.out.println(role.equals(opponent));
-		List<Move> actions = machine.getLegalMoves(state, opponent);
+		List<List<Move>> actions = machine.getLegalJointMoves(state, role, action);
 
 		// Loop through all actions
-		for (Move a : actions) {
-			List<Move> toMove = null;
-			// Make sure we perform the moves in the right order
-			if (role.equals(roles.get(0))) {
-				toMove = Arrays.asList(action, a);
-			} else {
-				toMove = Arrays.asList(a, action);
-			}
+		for (List<Move> a : actions) {
 			// get the new state we're going to be on
-			MachineState newState = machine.getNextState(state, toMove);
+			MachineState newState = machine.getNextState(state, a);
 			// System.out.println("Actions: " + actions);
 			// and... recurse and do this all over again
 			int result = maxscore_ab(role, newState, alpha, beta);
@@ -191,28 +179,14 @@ public class TeapotPlayer extends StateMachineGamer {
 
 	private int minscore_minimax_fixedDepth(Role role, Move action, MachineState state, int level) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
 		StateMachine machine = getStateMachine();
-		List<Role> roles = machine.getRoles();
-
-		// get the opponent
-		Role opponent = (role.equals(roles.get(0))) ? roles.get(1) : roles.get(0);
-		// System.out.println(role.equals(opponent));
-		List<Move> actions = machine.getLegalMoves(state, opponent);
+		List<List<Move>> actions = machine.getLegalJointMoves(state, role, action);
 
 		int score = 100;
 
 		// Loop through all actions
-		for (Move a : actions) {
-			List<Move> toMove = null;
-
-			// Make sure we perform the moves in the right order
-			if (role.equals(roles.get(0))) {
-				toMove = Arrays.asList(action, a);
-			} else {
-				toMove = Arrays.asList(a, action);
-			}
-
+		for (List<Move> a : actions) {
 			// get the new state we're going to be on
-			MachineState newState = machine.getNextState(state, toMove);
+			MachineState newState = machine.getNextState(state, a);
 			// System.out.println("Actions: " + actions);
 			// and... recurse and do this all over again
 			int result = maxscore_minimax_fixedDepth(role, newState, level + 1);
