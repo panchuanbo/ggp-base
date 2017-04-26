@@ -110,6 +110,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		Move bestAction = actions.get(0);
 		int bestScore = 0;
 
+		//keep iterating until time has reached the buffer point
 		for (this.limit = 0; !reachingTimeout(); this.limit++) {
 			//Go through each of the possible legal moves
 			for (Move action : actions) {
@@ -137,7 +138,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		// Base Case
 		if (machine.isTerminal(state)) return machine.getGoal(state, role);
 
-		// reached limit or timeout
+		// if reached limit or timeout, do weighted eval func heuristic
 		// This used to be the arbitrary Single player limit but now we do iterative deepening
 		if (level >= this.limit || reachingTimeout()) {
 			return (int) ( (0.25 * evalFuncGoal(role, state)) + (0.5 * evalFuncMobilityNStep(role, state)) + (0.25 * evalFuncMobilityOneStep(role, state)) );
@@ -153,9 +154,8 @@ public class TeapotPlayer extends StateMachineGamer {
 		return score;
 	}
 
-	// MARK - Multiplayer (alpha beta)
-	//NOTE: Need to change calls to minscore and maxscore so that we pass in alpha and beta
-		//alpha initially 0 and beta initially 100
+	// MARK - Multiplayer with fixed depth heuristic
+	// NOTE: we were originally doing alpha-beta
 	private Move selectMoveMultiPlayer() throws MoveDefinitionException, GoalDefinitionException, TransitionDefinitionException {
 		StateMachine machine = getStateMachine();
 
@@ -172,18 +172,22 @@ public class TeapotPlayer extends StateMachineGamer {
 		Move bestAction = actions.get(0);
 		int bestScore = 0;
 
-		//Set alpha and beta
+		/*Set alpha and beta
 		int alpha = 0;
 		int beta = 100;
+		*/
 
+		//iterative deepening: keep iterating till time has reached the buffer point
 		for (this.limit = 0; !reachingTimeout(); this.limit++) {
+
 			//Go through each of the possible legal moves
 			for (Move action : actions) {
 				if (reachingTimeout()) break;
 
-				//Get the result that gives the maximum score after going through the game tree
-				// Use alpha beta
-				//int result = minscore_ab(role, actions.get(i), state, alpha, beta);
+				/*Get the result that gives the maximum score after going through the game tree
+				 *Use alpha beta
+				 *int result = minscore_ab(role, actions.get(i), state, alpha, beta);
+				 */
 
 				// Use bounded minimax with fixed Depth heuristic
 				int result = minscore_minimax_fixedDepth(role, action, state, 0);
@@ -280,7 +284,7 @@ public class TeapotPlayer extends StateMachineGamer {
 			return evalFuncFocus(opponent, state);
 		}*/
 
-		System.out.println("On Level " + level + " with limit " + this.limit + ".");
+		//System.out.println("On Level " + level + " with limit " + this.limit + ".");
 
 		//If we reach a non-terminal state but have the limit level or timeout, do an evaluation function heuristic
 		// This used to be the arbitrary Multi player limit but now we do iterative deepening
