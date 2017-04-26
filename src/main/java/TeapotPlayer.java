@@ -44,6 +44,7 @@ public class TeapotPlayer extends StateMachineGamer {
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		// TODO - Uncomment + Finish
 		// Simulate games to learn more about what's happening/how to play
+		// Want to find out what weight values to use
 
 //		StateMachine machine = getStateMachine();
 //		Role role = getRole();
