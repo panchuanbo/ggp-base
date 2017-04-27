@@ -1,5 +1,7 @@
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 import org.ggp.base.apps.player.Player;
 import org.ggp.base.player.gamer.exception.GamePreviewException;
@@ -23,15 +25,19 @@ public class TeapotPlayer extends StateMachineGamer {
 	// Constants
 	private final static int NTH_STEP_MOBILITY_LIMIT = 2;
 	private final static int TIMEOUT_BUFFER = 2500; // 2500ms = 2.5s
+	private final static int NUM_WEIGHTS = 3;
 
 	// Stores the timeout (given timeout - buffer)
 	long timeout;
 
 	// Stores all the weights that we'll be using
-	int[] weights = new int[3];
+	double[] weights = new double[NUM_WEIGHTS];
 
 	// Stores the current limit for iterative deepening
 	int limit = 0;
+
+	// for debugging purposes, here's the limit
+	int turn = 0;
 
 	@Override
 	public StateMachine getInitialStateMachine() {
@@ -46,35 +52,71 @@ public class TeapotPlayer extends StateMachineGamer {
 		// Simulate games to learn more about what's happening/how to play
 		// Want to find out what weight values to use
 
-//		StateMachine machine = getStateMachine();
-//		Role role = getRole();
-//		MachineState state = getCurrentState();
-//		int level = 0, gamesSimulated = 0;
-//		int wins = 0, losses = 0, ties = 0;
-//		double ourMobility = 0, ourFocus = 0, ourGoal = 0;
-//		while (System.currentTimeMillis() < timeout - TIMEOUT_BUFFER) {
-//			ourMobility += evalFuncMobilityOneStep(role, state);
-//			ourFocus += evalFuncFocus(role, state);
-//			ourGoal += evalFuncGoal(role, state);
-//			List<Move> actions = machine.getLegalMoves(state, role);
-//			Move randomMove = actions.get((new Random()).nextInt(actions.size()));
-//			List<List<Move>> jointMoves = machine.getLegalJointMoves(state, role, randomMove);
-//			List<Move> randomJointMoves = jointMoves.get((new Random()).nextInt(jointMoves.size()));
-//			level++;
-//			state = machine.getNextState(state, randomJointMoves);
-//			if (machine.isTerminal(state)) {
-//				List<Integer> goals = machine.getGoals(state);
-//				// so find a way to use the goals and other data to understand what's happening
-//				machine = getStateMachine();
-//				role = getRole();
-//				state = getCurrentState();
-//				level = 0;
-//				gamesSimulated++;
-//			}
-//		}
-//
-//		System.out.println("Games Simulated: " + gamesSimulated);
+		this.turn = 0;
 
+		StateMachine machine = getStateMachine();
+		Role role = getRole();
+		MachineState state = getCurrentState();
+
+		for (Role r : machine.getRoles()) {
+			if (r.equals(role)) System.out.println("My Focus: " + evalFuncFocus(r, state));
+			else System.out.println("Opponent Focus: " + evalFuncFocus(r, state));
+		}
+
+		int ourMoveCount = 0, gamesSimulated = 0, gamesWeWon = 0;
+		ArrayList<Double> values = new ArrayList<>(Arrays.asList(0.0, 0.0, 0.0, 0.0, 0.0, 0.0));;
+		double ourMobility = 0, ourFocus = 0, ourGoal = 0;
+
+		while (System.currentTimeMillis() < timeout - TIMEOUT_BUFFER) {
+			if (machine.isTerminal(state)) { // done
+				gamesSimulated++;
+				int goal = machine.getGoal(state, role);
+				boolean useGame = true;
+				for (Role r : machine.getRoles()) {
+					if (!r.equals(role) && machine.getGoal(state, r) >= goal) useGame = false;
+				}
+				if (useGame) {
+					System.out.println("Our Score: " + goal + " | All Scores: " + machine.getGoals(state));
+					System.out.println("Mobility: " + ourMobility/ourMoveCount + " | Focus: " + ourFocus/ourMoveCount + " | Goal: " + ourGoal/ourMoveCount);
+					values.set(0, values.get(0) + ourMobility/ourMoveCount);
+					values.set(1, values.get(1) + ourFocus/ourMoveCount);
+					values.set(2, values.get(2) + ourGoal/ourMoveCount);
+					gamesWeWon++;
+				}
+
+				machine = getStateMachine();
+				role = getRole();
+				state = getCurrentState();
+				ourMobility = ourFocus = ourGoal = ourMoveCount = 0;
+			}
+
+			List<Move> actions = machine.getLegalMoves(state, role);
+			Move randomMove = actions.get((new Random()).nextInt(actions.size()));
+
+			if (actions.size() != 1) { // if there is only one possible move, don't let that i the overall outcome
+				double curMobility, curFocus, curGoal;
+				ourMobility += (curMobility = evalFuncMobilityOneStep(role, state));
+				// ourFocus += evalFuncFocus(role, state);
+				ourGoal += (curGoal = evalFuncGoal(role, state));
+				ourMoveCount++;
+			}
+
+			List<Move> randomJointMove = machine.getRandomJointMove(state, role, randomMove);
+			state = machine.getNextState(state, randomJointMove);
+		}
+
+		double sum = 0.0;
+		for (int i = 0; i < NUM_WEIGHTS; i++) {
+			values.set(i, values.get(i)/((gamesWeWon > 0) ? gamesWeWon : ourMoveCount));
+			sum += values.get(i);
+		}
+		for (int i = 0; i < NUM_WEIGHTS; i++) weights[i] = values.get(i)/sum;
+
+		System.out.println("Games Simulated: " + gamesSimulated);
+		System.out.println("Our Values: " + values);
+		System.out.println("# Games We Won: " + gamesWeWon);
+		System.out.print("Our Weights: [");
+		for (int i = 0; i < NUM_WEIGHTS; i++) System.out.print(weights[i] + ((i == NUM_WEIGHTS - 1) ? "]\n " : ", "));
 	}
 
 	@Override
@@ -86,6 +128,9 @@ public class TeapotPlayer extends StateMachineGamer {
 		List<Role> roles = machine.getRoles();
 
 		this.timeout = timeout - TIMEOUT_BUFFER;
+
+		this.turn++;
+		System.out.println("[" + getMatch().getGame().getName() + " | " + getMatch().getPlayerNamesFromHost() + "] (Turn " + this.turn + ") Score: " + machine.getGoal(getCurrentState(), getRole()) + " | State: " + getCurrentState());
 
 		// since we finished implementing joint legal moves, we can *technically* use only one type of player
 		if (roles.size() == 1) { // Use Complusive
@@ -290,7 +335,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		//If we reach a non-terminal state but have the limit level or timeout, do an evaluation function heuristic
 		// This used to be the arbitrary Multi player limit but now we do iterative deepening
 		if (level >= this.limit || reachingTimeout()) {
-			return (int) ( (0.45 * evalFuncGoal(role, state)) + (0.45 * evalFuncMobilityOneStep(role, state)) + (0.10 * evalFuncFocus(opponent, state)) );
+			return evalFunc(role, state); // decided to decomp this long line
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
@@ -302,6 +347,14 @@ public class TeapotPlayer extends StateMachineGamer {
 			if(result > score) score = result;
 		}
 		return score;
+	}
+
+	private int evalFunc(Role role, MachineState state) throws MoveDefinitionException, GoalDefinitionException {
+		// combined evalulation function
+		return (int) (weights[0] * evalFuncMobilityOneStep(role, state) + weights[1] * evalFuncFocus(role, state) + weights[2] * evalFuncGoal(role, state));
+
+		// kept this for backup reasons
+		// return (int) ( (0.45 * evalFuncGoal(role, state)) + (0.45 * evalFuncMobilityOneStep(role, state)) + (0.10 * evalFuncFocus(opponent, state)) );
 	}
 
 	private int evalFuncGoal(Role role, MachineState state) throws MoveDefinitionException, GoalDefinitionException {
@@ -318,7 +371,6 @@ public class TeapotPlayer extends StateMachineGamer {
 
 		return (int)((double)actions.size()/feasibles.size() * 100);
 	}
-
 
 	private int evalFuncMobilityNStepHelper(Role role, MachineState state, int xthStep) throws MoveDefinitionException, TransitionDefinitionException{
 		StateMachine machine = getStateMachine();
