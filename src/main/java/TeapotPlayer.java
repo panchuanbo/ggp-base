@@ -431,6 +431,20 @@ public class TeapotPlayer extends StateMachineGamer {
 		return 0;
 	}
 
+	private int montecarlo(Role role, MachineState state, int count) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+		int total = 0;
+		for (int i = 0; i < count; i++) total += depthCharge(role, state);
+		return total/count;
+	}
+
+	private int depthCharge(Role role, MachineState state) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+		StateMachine machine = getStateMachine();
+		while (!machine.isTerminal(state)) {
+			state = machine.getNextState(state, machine.getRandomJointMove(state));
+		}
+		return machine.getGoal(state, role);
+	}
+
 	private boolean reachingTimeout() {
 		return System.currentTimeMillis() > this.timeout;
 	}
