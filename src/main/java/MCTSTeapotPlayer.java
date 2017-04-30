@@ -1,3 +1,4 @@
+import java.util.Arrays;
 import java.util.List;
 
 import org.ggp.base.apps.player.Player;
@@ -39,20 +40,20 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		//which move are we on in the game?
 		this.turn = 0;
 	}
-	
+
 	//returns the move that our player will make
 	@Override
 	public Move stateMachineSelectMove(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		System.out.println("[" + getMatch().getGame().getName() + " | " + getMatch().getPlayerNamesFromHost() + "] (Turn " + this.turn + ") Score: " + getStateMachine().getGoal(getCurrentState(), getRole()) + " | State: " + getCurrentState());
-		
+
 		//the time period we have for deciding move excluding buffer time
 		this.timeout = timeout - TIMEOUT_BUFFER;
 		this.turn++;
 
 		//what are our player's legal moves?
 		List<Move> actions = getStateMachine().getLegalMoves(getCurrentState(), getRole());
-		
+
 		//if only one legal move possible, return immediately
 		//NOTE: eventually we should use this time anyway with caching
 		if (actions.size() == 1) return actions.get(0);
@@ -69,9 +70,9 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 			// System.out.println("Running MCTS");
 			runMCTS(rootNode);
 			// System.out.println("Finished Running MCTS");
-			for (int i = 0; i < rootNode.children.length; i++) {
-				System.out.print(((i == 0) ? "[" : "") + rootNode.children[i].visits + " (" + actions.get(i) + " : " + (double)rootNode.children[i].utility / rootNode.children[i].visits + ")" + ((i == rootNode.children.length - 1) ? "]\n" : ", "));
-			}
+//			for (int i = 0; i < rootNode.children.length; i++) {
+//				System.out.print(((i == 0) ? "[" : "") + rootNode.children[i].visits + " (" + actions.get(i) + " : " + (double)rootNode.children[i].utility / rootNode.children[i].visits + ")" + ((i == rootNode.children.length - 1) ? "]\n" : ", "));
+//			}
 		}
 
 		for (int i = 0; i < actions.size(); i++) {
@@ -121,8 +122,8 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 
 		int visits = 0;
 		int utility = 0; //sum of the goal values of the terminal states we visit in depth-charges from this node
-		Node[] children = null; //all 
-		
+		Node[] children = null; //all
+
 		//constructor
 		public Node(Node parent, MachineState state, boolean maxnode) {
 			this.parent = parent; this.state = state; this.maxnode = maxnode;
@@ -133,7 +134,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	//Select node corresponding to current state, expand the tree, do a depth charge, backpropagate
 	private void runMCTS(Node node) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
 //		System.out.println("Running MCTS");
-		
+
 		//Get the node to run depth-charges from
 		Node selectedNode = select(node);
 		if (getStateMachine().isTerminal(selectedNode.state)) {
@@ -141,37 +142,20 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 			backpropagate(selectedNode, getStateMachine().findReward(getRole(), selectedNode.state));
 			return;
 		}
-		
+
 		//expand the tree of selected node - i.e. forming nodes for its children
 		expand(selectedNode);
-		
+
 		//do one depth charge from the selected node
 		int score = simulateDepthCharge(getRole(), selectedNode, CHARGES_PER_NODE);
 		backpropagate(selectedNode, score);
 	}
 
 	private Node select(Node node) {
-//		System.out.println("In Select");
-		
-		//state will be null if we have moved but opponent's haven't moved yet
-		//node.state will be null only in multiplayer!
-		if (node.state != null) {
-//			System.out.println("- node.state != null");
-			
-			//if node hasn't been visited, then we want to select this null
-			if (node.visits == 0) return node;
-			
-			//NOTE: this line doesn't make sense - should delete
-			//if (node.children == null) return node;
-			
-			//node.children is our legal immediate moves
-			for (Node n : node.children) {
-				
-				//n.children is the 
-				for (Node nn : n.children) {
-					if (nn.visits == 0) return nn;
-				}
-			}
+		if (node.visits == 0) return node;
+		if (node.children == null) return node;
+		for (Node n : node.children) {
+			if (n.visits == 0) return n;
 		}
 
 		double score = 0;
@@ -195,15 +179,9 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		List<Move> actions = machine.findLegals(getRole(), node.state);
 		node.children = new Node[actions.size()];
 		for (int i = 0; i < actions.size(); i++) {
-			Node newNode = makeNode(node, null, !node.maxnode);
+			MachineState nextState = machine.getNextState(node.state, Arrays.asList(actions.get(i)));
+			Node newNode = makeNode(node, nextState, true);
 			node.children[i] = newNode;
-			List<List<Move>> jointMoves = machine.getLegalJointMoves(node.state, getRole(), actions.get(i));
-			newNode.children = new Node[jointMoves.size()];
-			for (int j = 0; j < jointMoves.size(); j++) {
-				MachineState s = machine.getNextState(node.state, jointMoves.get(j));
-				Node subNewNode = makeNode(newNode, s, !newNode.maxnode);
-				newNode.children[j] = subNewNode;
-			}
 		}
 	}
 
@@ -222,31 +200,112 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	}
 
 	private void backpropagate(Node node, int score) {
-		while (true) {
+		while (node != null) {
 			node.visits++;
 			node.utility += score;
-			Node parent = node.parent;
-			if (parent == null) break;
-			if (parent.maxnode) {
-				double maxVal = 0.0;
-				for (Node child : parent.children) {
-					if (child.visits != 0 && (double)child.utility / child.visits > maxVal) maxVal = (double)child.utility / child.visits;
-				}
-				score = (int)maxVal;
-			} else {
-				double minVal = Double.POSITIVE_INFINITY;
-				for (Node child : parent.children) {
-					if (child.visits != 0 && (double)child.utility / child.visits < minVal) minVal = (double)child.utility / child.visits;
-				}
-				score = (int)minVal;
-			}
-			node = parent;
+			node = node.parent;
 		}
 	}
 
 	private Node makeNode(Node parent, MachineState state, boolean maxnode) {
 		return new Node(parent, state, maxnode);
 	}
+
+	// MARK :- Multiplayer Ignore for now
+
+//	private Node select(Node node) {
+////		System.out.println("In Select");
+//
+//		//state will be null if we have moved but opponent's haven't moved yet
+//		//node.state will be null only in multiplayer!
+//		if (node.state != null) {
+////			System.out.println("- node.state != null");
+//
+//			//if node hasn't been visited, then we want to select this null
+//			if (node.visits == 0) return node;
+//
+//			//NOTE: this line doesn't make sense - should delete
+//			//if (node.children == null) return node;
+//
+//			//node.children is our legal immediate moves
+//			for (Node n : node.children) {
+//
+//				//n.children is the
+//				for (Node nn : n.children) {
+//					if (nn.visits == 0) return nn;
+//				}
+//			}
+//		}
+//
+//		double score = 0;
+//		Node result = node;
+//		for (Node n : node.children) {
+//			double newScore = selectfn(n);
+//			if (newScore > score) {
+//				score = newScore; result = n;
+//			}
+//		}
+//
+//		return select(result);
+//	}
+
+//	private void expand(Node node) throws MoveDefinitionException, TransitionDefinitionException {
+//		StateMachine machine = getStateMachine();
+//		List<Move> actions = machine.findLegals(getRole(), node.state);
+//		node.children = new Node[actions.size()];
+//		for (int i = 0; i < actions.size(); i++) {
+//			Node newNode = makeNode(node, null, !node.maxnode);
+//			node.children[i] = newNode;
+//			List<List<Move>> jointMoves = machine.getLegalJointMoves(node.state, getRole(), actions.get(i));
+//			newNode.children = new Node[jointMoves.size()];
+//			for (int j = 0; j < jointMoves.size(); j++) {
+//				MachineState s = machine.getNextState(node.state, jointMoves.get(j));
+//				Node subNewNode = makeNode(newNode, s, !newNode.maxnode);
+//				newNode.children[j] = subNewNode;
+//			}
+//		}
+//	}
+//
+//	private int simulateDepthCharge(Role role, Node node, int count) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+//		int total = 0;
+//		for (int i = 0; i < count; i++) total += depthCharge(role, node.state);
+//		return total/count;
+//	}
+//
+//	private int depthCharge(Role role, MachineState state) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+//		StateMachine machine = getStateMachine();
+//		while (!machine.isTerminal(state)) {
+//			state = machine.getNextState(state, machine.getRandomJointMove(state));
+//		}
+//		return machine.getGoal(state, role);
+//	}
+//
+//	private void backpropagate(Node node, int score) {
+//		while (true) {
+//			node.visits++;
+//			node.utility += score;
+//			Node parent = node.parent;
+//			if (parent == null) break;
+//			if (parent.maxnode) {
+//				double maxVal = 0.0;
+//				for (Node child : parent.children) {
+//					if (child.visits != 0 && (double)child.utility / child.visits > maxVal) maxVal = (double)child.utility / child.visits;
+//				}
+//				score = (int)maxVal;
+//			} else {
+//				double minVal = Double.POSITIVE_INFINITY;
+//				for (Node child : parent.children) {
+//					if (child.visits != 0 && (double)child.utility / child.visits < minVal) minVal = (double)child.utility / child.visits;
+//				}
+//				score = (int)minVal;
+//			}
+//			node = parent;
+//		}
+//	}
+//
+//	private Node makeNode(Node parent, MachineState state, boolean maxnode) {
+//		return new Node(parent, state, maxnode);
+//	}
 
 	// END MCTS IMPLEMENTATION
 	// ----------------------------------------------------------------------------------------------------------------
