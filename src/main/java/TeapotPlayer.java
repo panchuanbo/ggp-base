@@ -187,7 +187,11 @@ public class TeapotPlayer extends StateMachineGamer {
 		// if reached limit or timeout, do weighted eval func heuristic
 		// This used to be the arbitrary Single player limit but now we do iterative deepening
 		if (level >= this.limit || reachingTimeout()) {
-			return (int) ( (0.25 * evalFuncGoal(role, state)) + (0.5 * evalFuncMobilityNStep(role, state)) + (0.25 * evalFuncMobilityOneStep(role, state)) );
+			//This is the weighted heuristic function that we should decompose
+			//return (int) ( (0.25 * evalFuncGoal(role, state)) + (0.5 * evalFuncMobilityNStep(role, state)) + (0.25 * evalFuncMobilityOneStep(role, state)) );
+
+			//For now, only use Monte Carlo after iterative deepening
+			return montecarlo(role, state, 30);
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
@@ -335,7 +339,10 @@ public class TeapotPlayer extends StateMachineGamer {
 		//If we reach a non-terminal state but have the limit level or timeout, do an evaluation function heuristic
 		// This used to be the arbitrary Multi player limit but now we do iterative deepening
 		if (level >= this.limit || reachingTimeout()) {
-			return evalFunc(role, state); // decided to decomp this long line
+			//return evalFunc(role, state); // decided to decomp this long line
+
+			//For now, just return Monte Carlo Search
+			return montecarlo(role, state, 30);
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;

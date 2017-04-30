@@ -36,17 +36,25 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	public void stateMachineMetaGame(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		// TODO Auto-generated method stub
+		//which move are we on in the game?
 		this.turn = 0;
 	}
-
+	
+	//returns the move that our player will make
 	@Override
 	public Move stateMachineSelectMove(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		System.out.println("[" + getMatch().getGame().getName() + " | " + getMatch().getPlayerNamesFromHost() + "] (Turn " + this.turn + ") Score: " + getStateMachine().getGoal(getCurrentState(), getRole()) + " | State: " + getCurrentState());
+		
+		//the time period we have for deciding move excluding buffer time
 		this.timeout = timeout - TIMEOUT_BUFFER;
 		this.turn++;
 
+		//what are our player's legal moves?
 		List<Move> actions = getStateMachine().getLegalMoves(getCurrentState(), getRole());
+		
+		//if only one legal move possible, return immediately
+		//NOTE: eventually we should use this time anyway with caching
 		if (actions.size() == 1) return actions.get(0);
 
 		Node rootNode = makeNode(null, getCurrentState(), true);
@@ -105,39 +113,61 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	// ----------------------------------------------------------------------------------------------------------------
 	// BEGIN MCTS IMPLEMENTATION
 
+	//A node is essentially a state of the game, also tracks other info
 	class Node {
 		Node parent = null;
 		MachineState state = null;
-		boolean maxnode;
+		boolean maxnode; //true if maxnode, false if min-node
 
 		int visits = 0;
-		int utility = 0;
-		Node[] children = null;
-
+		int utility = 0; //sum of the goal values of the terminal states we visit in depth-charges from this node
+		Node[] children = null; //all 
+		
+		//constructor
 		public Node(Node parent, MachineState state, boolean maxnode) {
 			this.parent = parent; this.state = state; this.maxnode = maxnode;
 		}
 	}
 
+	//Execute the overall MCTS
+	//Select node corresponding to current state, expand the tree, do a depth charge, backpropagate
 	private void runMCTS(Node node) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
 //		System.out.println("Running MCTS");
+		
+		//Get the node to run depth-charges from
 		Node selectedNode = select(node);
 		if (getStateMachine().isTerminal(selectedNode.state)) {
+			//sketchy - is not sure what to do here
 			backpropagate(selectedNode, getStateMachine().findReward(getRole(), selectedNode.state));
 			return;
 		}
+		
+		//expand the tree of selected node - i.e. forming nodes for its children
 		expand(selectedNode);
-		int score = simulate(getRole(), selectedNode, CHARGES_PER_NODE);
+		
+		//do one depth charge from the selected node
+		int score = simulateDepthCharge(getRole(), selectedNode, CHARGES_PER_NODE);
 		backpropagate(selectedNode, score);
 	}
 
 	private Node select(Node node) {
 //		System.out.println("In Select");
+		
+		//state will be null if we have moved but opponent's haven't moved yet
+		//node.state will be null only in multiplayer!
 		if (node.state != null) {
 //			System.out.println("- node.state != null");
+			
+			//if node hasn't been visited, then we want to select this null
 			if (node.visits == 0) return node;
-			if (node.children == null) return node;
+			
+			//NOTE: this line doesn't make sense - should delete
+			//if (node.children == null) return node;
+			
+			//node.children is our legal immediate moves
 			for (Node n : node.children) {
+				
+				//n.children is the 
 				for (Node nn : n.children) {
 					if (nn.visits == 0) return nn;
 				}
@@ -177,7 +207,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		}
 	}
 
-	private int simulate(Role role, Node node, int count) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+	private int simulateDepthCharge(Role role, Node node, int count) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		int total = 0;
 		for (int i = 0; i < count; i++) total += depthCharge(role, node.state);
 		return total/count;
