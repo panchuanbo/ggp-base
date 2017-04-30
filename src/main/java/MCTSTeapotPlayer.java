@@ -122,7 +122,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 
 		int visits = 0;
 		int utility = 0; //sum of the goal values of the terminal states we visit in depth-charges from this node
-		Node[] children = null; //all
+		Node[] children = null; //all the immediate states following this one
 
 		//constructor
 		public Node(Node parent, MachineState state, boolean maxnode) {
@@ -151,44 +151,63 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		backpropagate(selectedNode, score);
 	}
 
+	//choose the node to run depth charges from
 	private Node select(Node node) {
+		
+		//if the given node hasn't been visited, we choose it
 		if (node.visits == 0) return node;
+		
+		//if the node is terminal, we have to choose it
 		if (getStateMachine().isTerminal(node.state)) return node;
+		
+		//go through the immediate next states, and if we haven't visited one, then we choose it
 		for (Node n : node.children) {
 			if (n.visits == 0) return n;
 		}
 
-		double score = 0;
-		Node result = node;
+		//reach this point if we've visited node and all its children at least once
+		double bestScore = 0; //the best upper confidence interval for a node
+		Node result = node; //node with best score
+		
 		for (Node n : node.children) {
-			double newScore = selectfn(n);
+			double newScore = selectfn(n); //get the score for node n
 			if (newScore > score) {
 				score = newScore; result = n;
 			}
 		}
 
-		return select(result);
+		return select(result); //return node with best score
 	}
 
+	//calculate node score, i.e. upper confidence bounds applied to TREES
+	//      ^
+	//     ^^^
+	//		|
 	private double selectfn(Node node) {
 		return (double)node.utility/node.visits + Math.sqrt(2 * Math.log(node.parent.visits)/node.visits);
 	}
 
+	//expand the tree by creating children for the given node
 	private void expand(Node node) throws MoveDefinitionException, TransitionDefinitionException {
 		StateMachine machine = getStateMachine();
 		List<Move> actions = machine.findLegals(getRole(), node.state);
-		node.children = new Node[actions.size()];
+		node.children = new Node[actions.size()]; //a list of new nodes
+		
+		//for each legal move, store the updated state
 		for (int i = 0; i < actions.size(); i++) {
-			MachineState nextState = machine.getNextState(node.state, Arrays.asList(actions.get(i)));
-			Node newNode = makeNode(node, nextState, true);
-			node.children[i] = newNode;
+			
+			//pass in the current state and the move we want to make to update the state
+			MachineState nextState = machine.getNextState(node.state, Arrays.asList(actions.get(i))); 
+			Node newNode = makeNode(node, nextState, true); //single-player, so we always set maxnode to true
+			node.children[i] = newNode; 
 		}
 	}
 
+	//
 	private int simulateDepthCharge(Role role, Node node, int count) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
-		int total = 0;
-		for (int i = 0; i < count; i++) total += depthCharge(role, node.state);
-		return total/count;
+		int sumGoalValues = 0; //sums the goal values from all depth charges so far
+		for (int i = 0; i < count; i++) sumGoalValues += depthCharge(role, node.state);
+		return sumGoalValues/count;
 	}
 
 	private int depthCharge(Role role, MachineState state) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
