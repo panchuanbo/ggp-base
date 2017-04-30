@@ -153,7 +153,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 
 	private Node select(Node node) {
 		if (node.visits == 0) return node;
-		if (node.children == null) return node;
+		if (getStateMachine().isTerminal(node.state)) return node;
 		for (Node n : node.children) {
 			if (n.visits == 0) return n;
 		}
