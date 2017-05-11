@@ -1,8 +1,10 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.commons.math3.stat.correlation.PearsonsCorrelation;
 import org.ggp.base.apps.player.Player;
 import org.ggp.base.player.gamer.exception.GamePreviewException;
 import org.ggp.base.player.gamer.statemachine.StateMachineGamer;
@@ -17,6 +19,7 @@ import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 
+
 public class TeapotPlayer extends StateMachineGamer {
 
 	// Convenience
@@ -25,7 +28,8 @@ public class TeapotPlayer extends StateMachineGamer {
 	// Constants
 	private final static int NTH_STEP_MOBILITY_LIMIT = 2;
 	private final static int TIMEOUT_BUFFER = 2500; // 2500ms = 2.5s
-	private final static int NUM_WEIGHTS = 3;
+	private final static int NUM_WEIGHTS = 4;
+	private final static int DEPTH_CHARGES = 5;
 
 	// Stores the timeout (given timeout - buffer)
 	long timeout;
@@ -48,75 +52,138 @@ public class TeapotPlayer extends StateMachineGamer {
 	@Override
 	public void stateMachineMetaGame(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
-		// TODO - Uncomment + Finish
-		// Simulate games to learn more about what's happening/how to play
-		// Want to find out what weight values to use
-
 		this.turn = 0;
 
 		StateMachine machine = getStateMachine();
 		Role role = getRole();
 		MachineState state = getCurrentState();
 
-		for (Role r : machine.getRoles()) {
-			if (r.equals(role)) System.out.println("My Focus: " + evalFuncFocus(r, state));
-			else System.out.println("Opponent Focus: " + evalFuncFocus(r, state));
-		}
+		ArrayList<Double> terminalScores = new ArrayList<Double>(Arrays.asList(0.));
+		ArrayList<Double> ourMobilityValues = new ArrayList<Double>(Arrays.asList(0.));
+		ArrayList<Double> ourFocusValues = new ArrayList<Double>(Arrays.asList(0.));
+		ArrayList<Double> ourGoalValues = new ArrayList<Double>(Arrays.asList(0.));
+		// ArrayList<Double> oppMobilityValues = new ArrayList<Double>(Arrays.asList(0.));
+		// ArrayList<Double> oppFocusValues = new ArrayList<Double>(Arrays.asList(0.));
 
-		int ourMoveCount = 0, gamesSimulated = 0, gamesWeWon = 0;
-		ArrayList<Double> values = new ArrayList<>(Arrays.asList(0.0, 0.0, 0.0, 0.0, 0.0, 0.0));;
-		double ourMobility = 0, ourFocus = 0, ourGoal = 0;
+		int gamesSimulated = 0;
 
 		while (System.currentTimeMillis() < timeout - TIMEOUT_BUFFER) {
 			if (machine.isTerminal(state)) { // done
-				gamesSimulated++;
 				int goal = machine.getGoal(state, role);
-				boolean useGame = true;
-				for (Role r : machine.getRoles()) {
-					if (!r.equals(role) && machine.getGoal(state, r) >= goal) useGame = false;
-				}
-				if (useGame) {
-					System.out.println("Our Score: " + goal + " | All Scores: " + machine.getGoals(state));
-					System.out.println("Mobility: " + ourMobility/ourMoveCount + " | Focus: " + ourFocus/ourMoveCount + " | Goal: " + ourGoal/ourMoveCount);
-					values.set(0, values.get(0) + ourMobility/ourMoveCount);
-					values.set(1, values.get(1) + ourFocus/ourMoveCount);
-					values.set(2, values.get(2) + ourGoal/ourMoveCount);
-					gamesWeWon++;
-				}
+				terminalScores.set(gamesSimulated, (double)goal); terminalScores.add(0.);
+				ourMobilityValues.add(0.); ourFocusValues.add(0.); ourGoalValues.add(0.);
+				// oppMobilityValues.add(0.); oppFocusValues.add(0.);
 
+				gamesSimulated++;
 				machine = getStateMachine();
 				role = getRole();
 				state = getCurrentState();
-				ourMobility = ourFocus = ourGoal = ourMoveCount = 0;
 			}
 
 			List<Move> actions = machine.getLegalMoves(state, role);
 			Move randomMove = actions.get((new Random()).nextInt(actions.size()));
 
 			if (actions.size() != 1) { // if there is only one possible move, don't let that i the overall outcome
-				double curMobility, curFocus, curGoal;
-				ourMobility += (curMobility = evalFuncMobilityOneStep(role, state));
-				// ourFocus += evalFuncFocus(role, state);
-				ourGoal += (curGoal = evalFuncGoal(role, state));
-				ourMoveCount++;
+				int mobility = evalFuncMobilityOneStep(role, state);
+				ourMobilityValues.set(gamesSimulated, ourMobilityValues.get(gamesSimulated) + mobility);
+				ourFocusValues.set(gamesSimulated, ourFocusValues.get(gamesSimulated) + (100 - mobility));
+				ourGoalValues.set(gamesSimulated, ourGoalValues.get(gamesSimulated) + machine.getGoal(state, role));
 			}
 
 			List<Move> randomJointMove = machine.getRandomJointMove(state, role, randomMove);
 			state = machine.getNextState(state, randomJointMove);
 		}
 
+		double[] ts = convertDoubles(terminalScores);
+		double[] ourMV = convertDoubles(ourMobilityValues);
+		double[] ourFV = convertDoubles(ourFocusValues);
+		double[] ourGV = convertDoubles(ourGoalValues);
+		PearsonsCorrelation pc = new PearsonsCorrelation();
+
+		double mobilityRSquared = pc.correlation(ourMV, ts);
+		double focusRSquared = pc.correlation(ourFV, ts);
+		double goalRSquared = pc.correlation(ourGV, ts);
+
+		double[] rawValues = {0.25, mobilityRSquared, focusRSquared, goalRSquared};
+
 		double sum = 0.0;
-		for (int i = 0; i < NUM_WEIGHTS; i++) {
-			values.set(i, values.get(i)/((gamesWeWon > 0) ? gamesWeWon : ourMoveCount));
-			sum += values.get(i);
+		for (int i = 0; i < 4; i++) {
+			if (rawValues[i] < 0.15 || Double.isNaN(rawValues[i])) rawValues[i] = 0;
+			else sum += rawValues[i];
 		}
-		for (int i = 0; i < NUM_WEIGHTS; i++) weights[i] = values.get(i)/sum;
+		for (int i = 0; i < 4; i++) weights[i] = rawValues[i]/sum;
+
+		System.out.println("R^2 Mobility: " + mobilityRSquared);
+		System.out.println("R^2 Focus: " + focusRSquared);
+		System.out.println("R^2 Goal: " + goalRSquared);
 
 		System.out.println("Games Simulated: " + gamesSimulated);
-		System.out.println("Our Values: " + values);
-		System.out.println("# Games We Won: " + gamesWeWon);
 		System.out.print("Our Weights: [");
 		for (int i = 0; i < NUM_WEIGHTS; i++) System.out.print(weights[i] + ((i == NUM_WEIGHTS - 1) ? "]\n " : ", "));
+
+		// TODO - Uncomment + Finish
+		// Simulate games to learn more about what's happening/how to play
+		// Want to find out what weight values to use
+
+//		for (Role r : machine.getRoles()) {
+//			if (r.equals(role)) System.out.println("My Focus: " + evalFuncFocus(r, state));
+//			else System.out.println("Opponent Focus: " + evalFuncFocus(r, state));
+//		}
+//
+//		int ourMoveCount = 0, gamesSimulated = 0, gamesWeWon = 0;
+//		ArrayList<Double> values = new ArrayList<>(Arrays.asList(0.0, 0.0, 0.0, 0.0, 0.0, 0.0));;
+//		double ourMobility = 0, ourFocus = 0, ourGoal = 0;
+//
+//		while (System.currentTimeMillis() < timeout - TIMEOUT_BUFFER) {
+//			if (machine.isTerminal(state)) { // done
+//				gamesSimulated++;
+//				int goal = machine.getGoal(state, role);
+//				boolean useGame = true;
+//				for (Role r : machine.getRoles()) {
+//					if (!r.equals(role) && machine.getGoal(state, r) >= goal) useGame = false;
+//				}
+//				if (useGame) {
+//					System.out.println("Our Score: " + goal + " | All Scores: " + machine.getGoals(state));
+//					System.out.println("Mobility: " + ourMobility/ourMoveCount + " | Focus: " + ourFocus/ourMoveCount + " | Goal: " + ourGoal/ourMoveCount);
+//					values.set(0, values.get(0) + ourMobility/ourMoveCount);
+//					values.set(1, values.get(1) + ourFocus/ourMoveCount);
+//					values.set(2, values.get(2) + ourGoal/ourMoveCount);
+//					gamesWeWon++;
+//				}
+//
+//				machine = getStateMachine();
+//				role = getRole();
+//				state = getCurrentState();
+//				ourMobility = ourFocus = ourGoal = ourMoveCount = 0;
+//			}
+//
+//			List<Move> actions = machine.getLegalMoves(state, role);
+//			Move randomMove = actions.get((new Random()).nextInt(actions.size()));
+//
+//			if (actions.size() != 1) { // if there is only one possible move, don't let that i the overall outcome
+//				double curMobility, curFocus, curGoal;
+//				ourMobility += (curMobility = evalFuncMobilityOneStep(role, state));
+//				// ourFocus += evalFuncFocus(role, state);
+//				ourGoal += (curGoal = evalFuncGoal(role, state));
+//				ourMoveCount++;
+//			}
+//
+//			List<Move> randomJointMove = machine.getRandomJointMove(state, role, randomMove);
+//			state = machine.getNextState(state, randomJointMove);
+//		}
+//
+//		double sum = 0.0;
+//		for (int i = 0; i < NUM_WEIGHTS; i++) {
+//			values.set(i, values.get(i)/((gamesWeWon > 0) ? gamesWeWon : ourMoveCount));
+//			sum += values.get(i);
+//		}
+//		for (int i = 0; i < NUM_WEIGHTS; i++) weights[i] = values.get(i)/sum;
+//
+//		System.out.println("Games Simulated: " + gamesSimulated);
+//		System.out.println("Our Values: " + values);
+//		System.out.println("# Games We Won: " + gamesWeWon);
+//		System.out.print("Our Weights: [");
+//		for (int i = 0; i < NUM_WEIGHTS; i++) System.out.print(weights[i] + ((i == NUM_WEIGHTS - 1) ? "]\n " : ", "));
 	}
 
 	@Override
@@ -191,7 +258,7 @@ public class TeapotPlayer extends StateMachineGamer {
 			//return (int) ( (0.25 * evalFuncGoal(role, state)) + (0.5 * evalFuncMobilityNStep(role, state)) + (0.25 * evalFuncMobilityOneStep(role, state)) );
 
 			//For now, only use Monte Carlo after iterative deepening
-			return montecarlo(role, state, 30);
+			return montecarlo(role, state, DEPTH_CHARGES);
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
@@ -252,6 +319,8 @@ public class TeapotPlayer extends StateMachineGamer {
 				}
 			}
 		}
+
+		System.out.println("Got to Depth: " + this.limit);
 
 		return bestAction;
 	}
@@ -339,10 +408,10 @@ public class TeapotPlayer extends StateMachineGamer {
 		//If we reach a non-terminal state but have the limit level or timeout, do an evaluation function heuristic
 		// This used to be the arbitrary Multi player limit but now we do iterative deepening
 		if (level >= this.limit || reachingTimeout()) {
-			//return evalFunc(role, state); // decided to decomp this long line
+			return evalFunc(role, state); // decided to decomp this long line
 
 			//For now, just return Monte Carlo Search
-			return montecarlo(role, state, 30);
+			// return montecarlo(role, state, 30);
 		}
 		List<Move> actions = machine.getLegalMoves(state, role);
 		int score = 0;
@@ -356,9 +425,10 @@ public class TeapotPlayer extends StateMachineGamer {
 		return score;
 	}
 
-	private int evalFunc(Role role, MachineState state) throws MoveDefinitionException, GoalDefinitionException {
+	private int evalFunc(Role role, MachineState state) throws MoveDefinitionException, GoalDefinitionException, TransitionDefinitionException {
 		// combined evalulation function
-		return (int) (weights[0] * evalFuncMobilityOneStep(role, state) + weights[1] * evalFuncFocus(role, state) + weights[2] * evalFuncGoal(role, state));
+		return (int) (weights[0] * montecarlo(role, state, 30) + weights[1] * evalFuncMobilityOneStep(role, state) + weights[2] * evalFuncFocus(role, state) + weights[3] * evalFuncGoal(role, state));
+		// return (int) (weights[0] * evalFuncMobilityOneStep(role, state) + weights[1] * evalFuncFocus(role, state) + weights[2] * evalFuncGoal(role, state));
 
 		// kept this for backup reasons
 		// return (int) ( (0.45 * evalFuncGoal(role, state)) + (0.45 * evalFuncMobilityOneStep(role, state)) + (0.10 * evalFuncFocus(opponent, state)) );
@@ -439,9 +509,12 @@ public class TeapotPlayer extends StateMachineGamer {
 	}
 
 	private int montecarlo(Role role, MachineState state, int count) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
-		int total = 0;
-		for (int i = 0; i < count; i++) total += depthCharge(role, state);
-		return total/count;
+		int total = 0, i = 0;
+		for (; i < count; i++) {
+			if (reachingTimeout()) break;
+			total += depthCharge(role, state);
+		}
+		return (i == 0) ? 0 : total/i;
 	}
 
 	private int depthCharge(Role role, MachineState state) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
@@ -455,6 +528,17 @@ public class TeapotPlayer extends StateMachineGamer {
 	private boolean reachingTimeout() {
 		return System.currentTimeMillis() > this.timeout;
 	}
+
+	public static double[] convertDoubles(List<Double> doubles) {
+	    double[] ret = new double[doubles.size()];
+	    Iterator<Double> iterator = doubles.iterator();
+	    for (int i = 0; i < ret.length; i++)
+	    {
+	        ret[i] = iterator.next().doubleValue();
+	    }
+	    return ret;
+	}
+
 
 	@Override
 	public void stateMachineStop() {
