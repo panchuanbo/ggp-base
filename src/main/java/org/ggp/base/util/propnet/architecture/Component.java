@@ -15,17 +15,63 @@ public abstract class Component implements Serializable
 
 	private static final long serialVersionUID = 352524175700224447L;
     /** The inputs to the component. */
-    private final Set<Component> inputs;
+    private final Set<Component> inputs_collection;
     /** The outputs of the component. */
-    private final Set<Component> outputs;
+    private final Set<Component> outputs_collection;
+
+    /** The inputs to the component (array) */
+    private Component[] inputs;
+    /** The outputs of the component. (array) */
+    private Component[] outputs;
+    /** single input */
+    private Component single_input;
+    /** single output */
+    private Component single_output;
+
+    /** is base? */
+    boolean baseProposition = false;
+    /** is input? */
+    boolean inputProposition = false;
+
+    public void setBase(boolean b) { this.baseProposition = b; }
+    public void setInput(boolean b) { this.inputProposition = b; }
+    public boolean isBase() { return this.baseProposition; }
+    public boolean isInput() { return this.inputProposition; }
+
+    /** Whether the value has been calculated or not */
+    private boolean calculated;
 
     /**
      * Creates a new Component with no inputs or outputs.
      */
     public Component()
     {
-        this.inputs = new HashSet<Component>();
-        this.outputs = new HashSet<Component>();
+        this.inputs_collection = new HashSet<Component>();
+        this.outputs_collection = new HashSet<Component>();
+        this.calculated = false;
+    }
+
+    public boolean isCalculated() { return this.calculated; }
+    public void setCalculated(boolean b) { this.calculated = b; }
+
+    /**
+     * We like arrays
+     */
+    public void crystalize() {
+    	inputs = new Component[this.inputs_collection.size()];
+    	outputs = new Component[this.outputs_collection.size()];
+    	int index = 0;
+    	for (Component c : this.inputs_collection) {
+    		if (index == 0) single_input = c;
+    		inputs[index] = c;
+    		index++;
+    	}
+    	index = 0;
+    	for (Component c : this.outputs_collection) {
+    		if (index == 0) single_output = c;
+    		outputs[index] = c;
+    		index++;
+    	}
     }
 
     /**
@@ -36,27 +82,27 @@ public abstract class Component implements Serializable
      */
     public void addInput(Component input)
     {
-        inputs.add(input);
+        inputs_collection.add(input);
     }
 
     public void removeInput(Component input)
     {
-    	inputs.remove(input);
+    	inputs_collection.remove(input);
     }
 
     public void removeOutput(Component output)
     {
-    	outputs.remove(output);
+    	outputs_collection.remove(output);
     }
 
     public void removeAllInputs()
     {
-		inputs.clear();
+		inputs_collection.clear();
 	}
 
 	public void removeAllOutputs()
 	{
-		outputs.clear();
+		outputs_collection.clear();
 	}
 
     /**
@@ -67,7 +113,7 @@ public abstract class Component implements Serializable
      */
     public void addOutput(Component output)
     {
-        outputs.add(output);
+        outputs_collection.add(output);
     }
 
     /**
@@ -76,6 +122,50 @@ public abstract class Component implements Serializable
      * @return The inputs to the component.
      */
     public Set<Component> getInputs()
+    {
+        return inputs_collection;
+    }
+
+    /**
+     * A convenience method, to get a single input.
+     * To be used only when the component is known to have
+     * exactly one input.
+     *
+     * @return The single input to the component.
+     */
+    public Component getSingleInput() {
+        assert inputs_collection.size() == 1;
+        return inputs_collection.iterator().next();
+    }
+
+    /**
+     * Getter method.
+     *
+     * @return The outputs of the component.
+     */
+    public Set<Component> getOutputs()
+    {
+        return outputs_collection;
+    }
+
+    /**
+     * A convenience method, to get a single output.
+     * To be used only when the component is known to have
+     * exactly one output.
+     *
+     * @return The single output to the component.
+     */
+    public Component getSingleOutput() {
+        assert outputs_collection.size() == 1;
+        return outputs_collection.iterator().next();
+    }
+
+    /**
+     * Getter method.
+     *
+     * @return The inputs to the component.
+     */
+    public Component[] fasterGetInputs()
     {
         return inputs;
     }
@@ -87,9 +177,9 @@ public abstract class Component implements Serializable
      *
      * @return The single input to the component.
      */
-    public Component getSingleInput() {
-        assert inputs.size() == 1;
-        return inputs.iterator().next();
+    public Component fasterGetSingleInput() {
+        // assert inputs.length == 1;
+        return single_input;
     }
 
     /**
@@ -97,9 +187,9 @@ public abstract class Component implements Serializable
      *
      * @return The outputs of the component.
      */
-    public Set<Component> getOutputs()
+    public Component[] fasterGetOutputs()
     {
-        return outputs;
+        return this.outputs;
     }
 
     /**
@@ -109,9 +199,9 @@ public abstract class Component implements Serializable
      *
      * @return The single output to the component.
      */
-    public Component getSingleOutput() {
-        assert outputs.size() == 1;
-        return outputs.iterator().next();
+    public Component fasterGetSingleOutput() {
+        // assert outputs.length == 1;
+        return single_output;
     }
 
     /**

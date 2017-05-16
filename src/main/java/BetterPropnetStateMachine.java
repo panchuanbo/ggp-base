@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import org.ggp.base.util.gdl.grammar.Gdl;
 import org.ggp.base.util.gdl.grammar.GdlConstant;
 import org.ggp.base.util.gdl.grammar.GdlRelation;
 import org.ggp.base.util.gdl.grammar.GdlSentence;
+import org.ggp.base.util.gdl.grammar.GdlTerm;
 import org.ggp.base.util.propnet.architecture.Component;
 import org.ggp.base.util.propnet.architecture.PropNet;
 import org.ggp.base.util.propnet.architecture.components.And;
@@ -26,10 +28,17 @@ import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import org.ggp.base.util.statemachine.implementation.prover.query.ProverQueryBuilder;
 
-public class BabyPropnetStateMachine extends StateMachine {
+public class BetterPropnetStateMachine extends StateMachine {
 
 	private PropNet propnet;
 	private List<Role> roles;
+	private Proposition[] basePropositions;
+	private Proposition[] inputPropositions;
+	private ArrayList<Map<GdlTerm, GdlSentence>> inputMap;
+
+//	private int[] inputsPerRole;
+//	private int[] mapToBetterInputMap;
+//	private GdlSentence[] betterInputMap;
 
 	@Override
 	public List<Move> findActions(Role role) throws MoveDefinitionException {
@@ -46,7 +55,56 @@ public class BabyPropnetStateMachine extends StateMachine {
 		try {
 			this.propnet = OptimizingPropNetFactory.create(description);
 			this.roles = propnet.getRoles();
-			System.out.println("Terminal Proposition: " + this.propnet.getTerminalProposition());
+			for (Component c : this.propnet.getComponents()) c.crystalize();
+			this.basePropositions = new Proposition[this.propnet.getBasePropositions().size()];
+			this.inputPropositions = new Proposition[this.propnet.getInputPropositions().size()];
+
+			List<Proposition> bases = new ArrayList<Proposition>(this.propnet.getBasePropositions().values());
+			for (int i = 0; i < this.basePropositions.length; i++) {
+				this.basePropositions[i] = bases.get(i);
+				this.basePropositions[i].setBase(true);
+			}
+
+			List<Proposition> inputs = new ArrayList<Proposition>(this.propnet.getInputPropositions().values());
+			for (int i = 0; i < this.inputPropositions.length; i++) {
+				this.inputPropositions[i] = inputs.get(i);
+				this.inputPropositions[i].setInput(true);
+			}
+
+//			this.inputsPerRole = new int[this.roles.size()];
+//			int total = 0;
+//			for (int i = 0; i < this.roles.size(); i++) {
+//				int sz = this.propnet.getLegalPropositions().get(roles.get(i)).size();
+//				this.inputsPerRole[i] = sz;
+//				total += sz;
+//			}
+//			this.mapToBetterInputMap = new int[total];
+//			this.betterInputMap = new GdlSentence[total];
+//
+//			for (int i = 0; i < this.roles.size(); i++) {
+//				Role r = this.roles.get(i);
+//				Set<Proposition> moves = this.propnet.getLegalPropositions().get(r);
+//				Map<GdlTerm, GdlSentence> buf = new HashMap<>();
+//				for (Proposition p : moves) {
+//					GdlSentence moveSentence = ProverQueryBuilder.toDoes(r, new Move(p.getName().get(1)));
+//					buf.put(p.getName().get(1), moveSentence);
+////					System.out.println("key: " + p.getName().get(1) + " | value: " + moveSentence);
+//				}
+//			}
+//
+			this.inputMap = new ArrayList<>();
+
+			for (Role r : this.roles) {
+				Set<Proposition> moves = this.propnet.getLegalPropositions().get(r);
+				Map<GdlTerm, GdlSentence> buf = new HashMap<>();
+				for (Proposition p : moves) {
+					GdlSentence moveSentence = ProverQueryBuilder.toDoes(r, new Move(p.getName().get(1)));
+					buf.put(p.getName().get(1), moveSentence);
+//					System.out.println("key: " + p.getName().get(1) + " | value: " + moveSentence);
+				}
+				this.inputMap.add(buf);
+			}
+			// System.out.println("input map: " + this.inputMap);
 			//System.out.println("Wrote propnet to disk.");
 			//this.propnet.renderToFile("C:\\Users\\panch\\Desktop\\propnet.out");
 		} catch (InterruptedException e) {
@@ -70,7 +128,7 @@ public class BabyPropnetStateMachine extends StateMachine {
 	public boolean isTerminal(MachineState state) {
 		this.clearpropnet();
 		this.markbases(state);
-		for (Component c : this.propnet.getTerminalProposition().getInputs()) {
+		for (Component c : this.propnet.getTerminalProposition().fasterGetInputs()) {
 			if (!prop(c)) return false;
 		}
 
@@ -79,7 +137,7 @@ public class BabyPropnetStateMachine extends StateMachine {
 
 	@Override
 	public List<Role> getRoles() {
-		return roles;
+		return this.roles;
 	}
 
 	@Override
@@ -87,11 +145,9 @@ public class BabyPropnetStateMachine extends StateMachine {
 		this.clearpropnet();
 		this.propnet.getInitProposition().setValue(true);
 		Set<GdlSentence> state = new HashSet<GdlSentence>();
-//		System.out.println("Start Initial State Prop");
-		for (Proposition base : this.propnet.getBasePropositions().values()) {
-			if (prop(base.getSingleInput())) state.add(base.getName());
+		for (Proposition base : this.basePropositions) {
+			if (prop(base.fasterGetSingleInput())) state.add(base.getName());
 		}
-//		System.out.println("End Initial State Prop");
 		System.out.println("INITIAL STATE VALUES: " + state);
 		return new MachineState(state);
 	}
@@ -102,64 +158,60 @@ public class BabyPropnetStateMachine extends StateMachine {
 		this.markbases(state);
 		Set<Proposition> legalProps = this.propnet.getLegalPropositions().get(role);
 		ArrayList<Move> moves = new ArrayList<Move>();
-//		System.out.println("Start Legal Moves Prop");
 		for (Proposition p : legalProps) {
-			if (prop(p.getSingleInput())) moves.add(this.getMoveFromProposition(p));
+			if (prop(p.fasterGetSingleInput())) moves.add(this.getMoveFromProposition(p));
 		}
-//		System.out.println("End Legal Moves Prop");
-		System.out.println("Legal Moves: " + moves);
+//		System.out.println("Legal Moves: " + moves);
 		return moves;
 	}
 
 	@Override
 	public MachineState getNextState(MachineState state, List<Move> moves) throws TransitionDefinitionException {
-//		System.out.println("[getNextState] @param state: " + state);
-//		System.out.println("[getNextState] @param moves: " + moves);
 		this.clearpropnet();
 		this.markactions(moves);
 		this.markbases(state);
 		Set<GdlSentence> gdlState = new HashSet<GdlSentence>();
-//		System.out.println("Start Get Next State Prop");
-//		System.out.println("Base Prop: " + this.propnet.getBasePropositions().values());
-		for (Proposition base : this.propnet.getBasePropositions().values()) {
-//			System.out.println("Proposition: " + base + " | value: " + base.getValue());
-//			if (prop(base.getSingleInput())) {System.out.println("Input True?"); gdlState.add(base.getName());}
-			if (prop(base.getSingleInput())) gdlState.add(base.getName());
+		for (Proposition base : this.basePropositions) {
+			if (prop(base.fasterGetSingleInput())) gdlState.add(base.getName());
 		}
-//		System.out.println("End Get Next State Prop");
-		System.out.println("NEXT STATE VALUES: " + gdlState);
+//		System.out.println("NEXT STATE VALUES: " + gdlState);
 		return new MachineState(gdlState);
 	}
 
 	// ----------------------------------------------
 
 	private boolean prop(Component p) {
-//		System.out.println("Class: " + p.getClass());
-//		if (this.propnet.getBasePropositions().containsValue(p)) {System.out.println("reached base " + ((Proposition)p).getName() + " with val: " + p.getValue()); return p.getValue();}
-		if (this.propnet.getBasePropositions().containsValue(p)) return p.getValue();
-		if (this.propnet.getInputPropositions().containsValue(p)) return p.getValue();
+		if ((p instanceof Proposition) && p.isCalculated()) return p.getValue();
+		if (p.getClass().equals(Transition.class)) prop(p.getSingleInput());
+		if (p.isBase()) return p.getValue();
+		if (p.isInput()) return p.getValue();
 		if (p.getClass().equals(And.class)) return propAND(p);
-		if (p.getClass().equals(Transition.class)) return propOR(p);
 		if (p.getClass().equals(Or.class)) return propOR(p);
 		if (p.getClass().equals(Not.class)) return propNOT(p);
 		if (p.getClass().equals(Constant.class)) return p.getValue();
-		if (p.getInputs().size() == 0) return p.getValue();
+		if (p.fasterGetInputs().length == 0) return p.getValue();
 
-		return prop(p.getSingleInput());
+		boolean val = prop(p.fasterGetSingleInput());
+		if (p.getClass().equals(Proposition.class)) {
+			((Proposition)p).setValue(val);
+			p.setCalculated(true);
+		}
+
+		return val;
 	}
 
 	private boolean propAND(Component p) {
-		for (Component c : p.getInputs()) if (!prop(c)) return false;
+		for (Component c : p.fasterGetInputs()) if (!prop(c)) return false;
 		return true;
 	}
 
 	private boolean propOR(Component p) {
-		for (Component c : p.getInputs()) if (prop(c)) return true;
+		for (Component c : p.fasterGetInputs()) if (prop(c)) return true;
 		return false;
 	}
 
 	private boolean propNOT(Component p) {
-		return !prop(p.getSingleInput());
+		return !prop(p.fasterGetSingleInput());
 	}
 
 	private void markbases(MachineState s) {
@@ -169,37 +221,25 @@ public class BabyPropnetStateMachine extends StateMachine {
 	}
 
 	private void markactions(List<Move> moves) {
-		List<GdlSentence> gdlMoves = toDoes(moves);
+		GdlSentence[] gdlMoves = toDoes(moves);
 		for (GdlSentence m : gdlMoves) {
 			this.propnet.getInputPropositions().get(m).setValue(true);
 		}
 	}
 
 	private void clearpropnet() {
-		for (Proposition p : this.propnet.getPropositions()) p.setValue(false);
+		for (Proposition p : this.propnet.getPropositions()) {
+			p.setValue(false);
+			p.setCalculated(false);
+		}
 	}
 
-    /**
-     * The Input propositions are indexed by (does ?player ?action).
-     *
-     * This translates a list of Moves (backed by a sentence that is simply ?action)
-     * into GdlSentences that can be used to get Propositions from inputPropositions.
-     * and accordingly set their values etc.  This is a naive implementation when coupled with
-     * setting input values, feel free to change this for a more efficient implementation.
-     *
-     * @param moves
-     * @return
-     */
-    private List<GdlSentence> toDoes(List<Move> moves) {
-    	List<GdlSentence> doeses = new ArrayList<GdlSentence>(moves.size());
-        Map<Role, Integer> roleIndices = getRoleIndices();
-
-        for (int i = 0; i < roles.size(); i++)
-        {
-            int index = roleIndices.get(roles.get(i));
-            doeses.add(ProverQueryBuilder.toDoes(roles.get(i), moves.get(index)));
-        }
-        return doeses;
+    private GdlSentence[] toDoes(List<Move> moves) {
+    	GdlSentence[] doeses = new GdlSentence[moves.size()];
+    	for (int i = 0; i < moves.size(); i++) {
+    		doeses[i] = this.inputMap.get(i).get(moves.get(i).getContents());
+    	}
+    	return doeses;
     }
 
     /**
