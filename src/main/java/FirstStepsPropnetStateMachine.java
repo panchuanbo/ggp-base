@@ -28,7 +28,7 @@ import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import org.ggp.base.util.statemachine.implementation.prover.query.ProverQueryBuilder;
 
-public class BetterPropnetStateMachine extends StateMachine {
+public class FirstStepsPropnetStateMachine extends StateMachine {
 
 	private PropNet propnet;
 	private List<Role> roles;
@@ -148,7 +148,7 @@ public class BetterPropnetStateMachine extends StateMachine {
 		for (Proposition base : this.basePropositions) {
 			if (prop(base.fasterGetSingleInput())) state.add(base.getName());
 		}
-		System.out.println("INITIAL STATE VALUES: " + state);
+//		System.out.println("INITIAL STATE VALUES: " + state);
 		return new MachineState(state);
 	}
 

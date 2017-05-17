@@ -29,14 +29,19 @@ public abstract class Component implements Serializable
     private Component single_output;
 
     /** is base? */
-    boolean baseProposition = false;
+    private boolean baseProposition = false;
     /** is input? */
-    boolean inputProposition = false;
+    private boolean inputProposition = false;
+
+    /** previous value */
+    boolean previousValue = false;
 
     public void setBase(boolean b) { this.baseProposition = b; }
     public void setInput(boolean b) { this.inputProposition = b; }
     public boolean isBase() { return this.baseProposition; }
     public boolean isInput() { return this.inputProposition; }
+    public boolean previousValue() { return this.previousValue; }
+    public void setPreviousValue(boolean b) { this.previousValue = b; }
 
     /** Whether the value has been calculated or not */
     private boolean calculated;

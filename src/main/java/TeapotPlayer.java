@@ -47,6 +47,7 @@ public class TeapotPlayer extends StateMachineGamer {
 	public StateMachine getInitialStateMachine() {
 		// TODO Auto-generated method stub
 		return new CachedStateMachine(new ProverStateMachine());
+//		return new CachedStateMachine(new FirstStepsPropnetStateMachine());
 	}
 
 	@Override
