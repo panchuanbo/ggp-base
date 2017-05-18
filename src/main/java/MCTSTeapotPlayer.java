@@ -17,7 +17,6 @@ import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
 import org.ggp.base.util.statemachine.Role;
 import org.ggp.base.util.statemachine.StateMachine;
-import org.ggp.base.util.statemachine.cache.CachedStateMachine;
 import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
@@ -54,7 +53,8 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	// debugging
 	StateMachine backupStateMachine;
 
-	Node root_node;
+	// keep track of the root node
+	Node rootNode;
 
 	int depthCharges = 0;
 
@@ -62,8 +62,9 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	public StateMachine getInitialStateMachine() {
 //		return new CachedStateMachine(new ProverStateMachine());
 //		return new CachedStateMachine(new BabyPropnetStateMachine());
-		return new CachedStateMachine(new FirstStepsPropnetStateMachine());
-//		return new CachedStateMachine(new HopefullyBetterPropnetStateMachineQuestionMark());
+//		return new CachedStateMachine(new FirstStepsPropnetStateMachine());
+//		return new FirstStepsPropnetStateMachine();
+		return new HopefullyBetterPropnetStateMachineQuestionMark();
 	}
 
 	@Override
@@ -81,18 +82,18 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		this.decayValues = new double[100];
 		for (int i = 1; i <= this.decayValues.length; i++) {
 			this.decayValues[i-1] = 1/(Math.pow(i, 0.25));
-			System.out.print("" + this.decayValues[i-1] + ", ");
 		}
 
-//		this.root_node = makeNode(null, getCurrentState(), true, null);
-//		while (System.currentTimeMillis() < timeout - TIMEOUT_BUFFER) {
-//			try {
-//				runMCTS(this.root_node);
-//			} catch (InterruptedException | ExecutionException e) {
-//				// TODO Auto-generated catch block
-//				e.printStackTrace();
-//			}
-//		}
+		rootNode = makeNode(null, getCurrentState(), true, null);
+		System.out.println("\nMetagame Initial State: " + getCurrentState());
+		while (System.currentTimeMillis() < timeout - TIMEOUT_BUFFER) {
+			try {
+				runMCTS(rootNode);
+			} catch (InterruptedException | ExecutionException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 
 		this.turn = 0;
 	}
@@ -110,13 +111,51 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		this.depthCharges = 0;
 		selectTime = expandTime = depthChargeTime = backpropTime = 0;
 
+//		System.out.println("CURRENT: " + getCurrentState());
+//		System.out.println("__STATE: " + rootNode.state);
+		if (!rootNode.state.equals(getCurrentState())) {
+			boolean found = false;
+			for (Node n : rootNode.children) {
+				if (n != null) {
+					for (Node nn : n.children) {
+						if (nn != null) {
+//							System.out.println("__STATE: " + nn.state);
+							if (nn.state.equals(getCurrentState())) {
+								found = true;
+								rootNode = nn;
+								rootNode.parent = null;
+								break;
+							}
+						}
+					}
+				}
+				if (found) break;
+			}
+			if (!found) {
+				System.out.println("NOT FOUND: REGENERATING");
+				rootNode = makeNode(null, getCurrentState(), true, null);
+			} else {
+//				System.out.println("FOUND, RESETTING ROOT NODE (" + rootNode.visits + ", " + rootNode.utility/rootNode.visits + ")");
+			}
+		}
+
 		//what are our player's legal moves?
 		List<Move> actions = getStateMachine().getLegalMoves(getCurrentState(), getRole());
 
 		//if only one legal move possible, return immediately
-		if (actions.size() == 1) return actions.get(0);
+		if (actions.size() == 1) {
+			while (!reachingTimeout()) {
+				try {
+					runMCTS(rootNode);
+				} catch (InterruptedException | ExecutionException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			return actions.get(0);
+		}
 
-		Node rootNode = makeNode(null, getCurrentState(), true, null);
+//		Node rootNode = makeNode(null, getCurrentState(), true, null);
 		System.out.println("Got Root Node with State: " + getCurrentState());
 
 		double bestUtility = 0;
@@ -131,11 +170,13 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+			for (Node n : rootNode.children) {
+				if (n != null && n.finishedComputing && n.actual_utility == 100) return n.action;
+			}
 			if (rootNode.finishedComputing) break;
 		}
 
-		System.out.println("Done running MCTS: (Depth Charges: " + this.depthCharges + ") (MCTS Loops: " + loops_ran + ")");
-
+		int level = 0;
 		for (int i = 0; i < actions.size(); i++) {
 			Node n = rootNode.children[i];
 			if (n != null) {
@@ -143,11 +184,13 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 				if (n.finishedComputing) {
 					bestUtility = n.actual_utility;
 					bestAction = actions.get(i);
+					level = n.level;
 					System.out.println("Finished computing the subtree...");
 				} else {
 					if (n.visits != 0 && n.utility / n.visits > bestUtility) {
 						bestUtility = n.utility / n.visits;
 						bestAction = actions.get(i);
+						level = n.level;
 					}
 				}
 			} else {
@@ -155,7 +198,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 			}
 		}
 
-		System.out.println("(Depth Charges: " + this.depthCharges + ") (MCTS Loops: " + loops_ran + ")" + "Best Action: " + bestAction + " Score: " + bestUtility);
+		System.out.println("(Depth Charges: " + this.depthCharges + ") (MCTS Loops: " + loops_ran + ")" + "Best Action: " + bestAction + " Score: " + bestUtility + " Depth: " + (this.rootNode.level - level));
 		System.out.println("Select Time: " + this.selectTime/NANOSECOND_IN_SECOND + " | Expand Time: " + this.expandTime/NANOSECOND_IN_SECOND + " | DC Time: " + this.depthChargeTime/NANOSECOND_IN_SECOND + " | Backprop Time: " + this.backpropTime/NANOSECOND_IN_SECOND);
 
 		return bestAction;
@@ -453,9 +496,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 
 		if (node.maxnode) return node.utility/node.visits + decay * BRIAN_C_FACTOR * Math.sqrt(Math.log(node.parent.visits)/node.visits);
 		else {
-			double val = -node.utility/node.visits + decay * BRIAN_C_FACTOR * Math.sqrt(Math.log(node.parent.visits)/node.visits);
-			return val;
-			//return (val < 0) ? 0 : val;
+			return -node.utility/node.visits + decay * BRIAN_C_FACTOR * Math.sqrt(Math.log(node.parent.visits)/node.visits);
 		}
 	}
 

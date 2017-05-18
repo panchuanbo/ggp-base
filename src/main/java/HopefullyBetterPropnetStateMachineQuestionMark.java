@@ -12,10 +12,7 @@ import org.ggp.base.util.gdl.grammar.GdlSentence;
 import org.ggp.base.util.gdl.grammar.GdlTerm;
 import org.ggp.base.util.propnet.architecture.Component;
 import org.ggp.base.util.propnet.architecture.PropNet;
-import org.ggp.base.util.propnet.architecture.components.And;
-import org.ggp.base.util.propnet.architecture.components.Constant;
 import org.ggp.base.util.propnet.architecture.components.Not;
-import org.ggp.base.util.propnet.architecture.components.Or;
 import org.ggp.base.util.propnet.architecture.components.Proposition;
 import org.ggp.base.util.propnet.architecture.components.Transition;
 import org.ggp.base.util.propnet.factory.OptimizingPropNetFactory;
@@ -117,7 +114,6 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 	public int getGoal(MachineState state, Role role) throws GoalDefinitionException {
 		this.markbases(state);
 		for (Component c : this.basePropositions) forwardprop(c);
-//		for (Component c : this.inputPropositions) forwardprop(c);
 		Set<Proposition> goalProps = this.propnet.getGoalPropositions().get(role);
 		for (Proposition p : goalProps) {
 			if (p.getValue()) return this.getGoalValue(p);
@@ -129,7 +125,6 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 	public boolean isTerminal(MachineState state) {
 		this.markbases(state);
 		for (Component c : this.basePropositions) forwardprop(c);
-//		for (Component c : this.inputPropositions) forwardprop(c);
 		for (Component c : this.propnet.getTerminalProposition().fasterGetInputs()) {
 			if (!c.getValue()) return false;
 		}
@@ -155,6 +150,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 		}
 //		for (Component c : this.propnet.getComponents()) c.setPreviousValue(c.getValue());
 		System.out.println("INITIAL STATE VALUES: " + state);
+		this.propnet.getInitProposition().setValue(false);
 		return new MachineState(state);
 	}
 
@@ -162,7 +158,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 	public List<Move> getLegalMoves(MachineState state, Role role) throws MoveDefinitionException {
 		this.markbases(state);
 		for (Component c : this.basePropositions) forwardprop(c);
-//		for (Component c : this.inputPropositions) forwardprop(c);
+//		for (Component c : this.propnet.getComponents()) c.setPreviousValue(c.getValue());
 		Set<Proposition> legalProps = this.propnet.getLegalPropositions().get(role);
 		ArrayList<Move> moves = new ArrayList<Move>();
 		for (Proposition p : legalProps) {
@@ -178,6 +174,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 		this.markbases(state);
 		for (Component c : this.basePropositions) forwardprop(c);
 		for (Component c : this.inputPropositions) forwardprop(c);
+//		for (Component c : this.propnet.getComponents()) c.setPreviousValue(c.getValue());
 		Set<GdlSentence> gdlState = new HashSet<GdlSentence>();
 		for (Proposition base : this.basePropositions) {
 			if (base.fasterGetSingleInput().getValue()) gdlState.add(base.getName());
@@ -190,9 +187,9 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 	// ----------------------------------------------
 
 	private void forwardprop(Component c) {
-//		System.out.println("" + c.toString());
 		boolean c_val = c.getValue();
 		if (c_val == c.previousValue()) return;
+		c.setPreviousValue(c_val);
 		if ((c instanceof Transition)) return;
 		for (Component o : c.fasterGetOutputs()) {
 			if ((o instanceof Proposition)) {
@@ -201,63 +198,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 			}
 			forwardprop(o);
 		}
-		c.setPreviousValue(c_val);
 	}
-
-	// All things backprop
-
-	private boolean backprop(Component p) {
-		if ((p instanceof Proposition) && p.isCalculated()) return p.getValue();
-		if (p.getClass().equals(Transition.class)) backprop(p.getSingleInput());
-		if (p.isBase()) return p.getValue();
-		if (p.isInput()) return p.getValue();
-		if (p.getClass().equals(And.class)) return propAND(p);
-		if (p.getClass().equals(Or.class)) return propOR(p);
-		if (p.getClass().equals(Not.class)) return propNOT(p);
-		if (p.getClass().equals(Constant.class)) return p.getValue();
-		if (p.fasterGetInputs().length == 0) return p.getValue();
-
-		boolean val = backprop(p.fasterGetSingleInput());
-		if (p.getClass().equals(Proposition.class)) {
-			((Proposition)p).setValue(val);
-			p.setCalculated(true);
-		}
-
-		return val;
-	}
-
-	private boolean propAND(Component p) {
-		for (Component c : p.fasterGetInputs()) if (!backprop(c)) {
-			p.setPreviousValue(false);
-			return false;
-		}
-		p.setPreviousValue(true);
-		return true;
-	}
-
-	private boolean propOR(Component p) {
-		for (Component c : p.fasterGetInputs()) if (backprop(c)) {
-			p.setPreviousValue(true);
-			return true;
-		}
-		p.setPreviousValue(false);
-		return false;
-	}
-
-	private boolean propNOT(Component p) {
-		boolean val = !backprop(p.fasterGetSingleInput());
-		p.setPreviousValue(val);
-		return val;
-	}
-
-	private void clearpropnet() {
-		for (Proposition p : this.propnet.getPropositions()) {
-			p.setValue(false);
-			p.setCalculated(false);
-		}
-	}
-
-	// All things forwardprop
 
 	private void markbases(MachineState s) {
 		for (Proposition p : this.basePropositions) {
