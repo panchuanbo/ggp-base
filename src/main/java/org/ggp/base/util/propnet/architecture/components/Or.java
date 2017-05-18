@@ -8,6 +8,9 @@ import org.ggp.base.util.propnet.architecture.Component;
 @SuppressWarnings("serial")
 public final class Or extends Component
 {
+	public int counter = 0;
+	public boolean useFastMethod = false;
+
 	/**
 	 * Returns true if and only if at least one of the inputs to the or is true.
 	 *
@@ -16,14 +19,19 @@ public final class Or extends Component
 	@Override
 	public boolean getValue()
 	{
-		for ( Component component : getInputs() )
-		{
-			if ( component.getValue() )
+		if (useFastMethod) {
+			if (counter > 0) return true;
+			return false;
+		} else {
+			for ( Component component : getInputs() )
 			{
-				return true;
+				if ( component.getValue() )
+				{
+					return true;
+				}
 			}
+			return false;
 		}
-		return false;
 	}
 
 	/**

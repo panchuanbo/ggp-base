@@ -8,6 +8,9 @@ import org.ggp.base.util.propnet.architecture.Component;
 @SuppressWarnings("serial")
 public final class And extends Component
 {
+	public int counter = 0;
+	public boolean useFastMethod = false;
+
 	/**
 	 * Returns true if and only if every input to the and is true.
 	 *
@@ -16,14 +19,19 @@ public final class And extends Component
 	@Override
 	public boolean getValue()
 	{
-		for ( Component component : getInputs() )
-		{
-			if ( !component.getValue() )
+		if (useFastMethod) {
+			if (counter == this.numberOfInputs()) return true;
+			return false;
+		} else {
+			for ( Component component : getInputs() )
 			{
-				return false;
+				if ( !component.getValue() )
+				{
+					return false;
+				}
 			}
+			return true;
 		}
-		return true;
 	}
 
 	/**

@@ -12,7 +12,9 @@ import org.ggp.base.util.gdl.grammar.GdlSentence;
 import org.ggp.base.util.gdl.grammar.GdlTerm;
 import org.ggp.base.util.propnet.architecture.Component;
 import org.ggp.base.util.propnet.architecture.PropNet;
+import org.ggp.base.util.propnet.architecture.components.And;
 import org.ggp.base.util.propnet.architecture.components.Not;
+import org.ggp.base.util.propnet.architecture.components.Or;
 import org.ggp.base.util.propnet.architecture.components.Proposition;
 import org.ggp.base.util.propnet.architecture.components.Transition;
 import org.ggp.base.util.propnet.factory.OptimizingPropNetFactory;
@@ -140,7 +142,11 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 	@Override
 	public MachineState getInitialState() {
 		this.propnet.getInitProposition().setValue(true);
-		for (Component c : this.propnet.getComponents()) c.setPreviousValue(false);
+		for (Component c : this.propnet.getComponents()) {
+			if ((c instanceof And)) ((And) c).useFastMethod = true;
+			if ((c instanceof Or)) ((Or) c).useFastMethod = true;
+			c.setPreviousValue(false);
+		}
 		for (Component c : this.propnet.getComponents()) if ((c instanceof Not)) forwardprop(c);
 		forwardprop(this.propnet.getInitProposition());
 
@@ -196,6 +202,8 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 				o.setPreviousValue(o.getValue());
 				((Proposition) o).setValue(c_val);
 			}
+			if ((o instanceof And)) ((And) o).counter += (c_val) ? 1 : -1;
+			if ((o instanceof Or)) ((Or) o).counter += (c_val) ? 1 : -1;
 			forwardprop(o);
 		}
 	}
@@ -206,6 +214,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 			p.setValue(false);
 		}
 		for (GdlSentence sentence : s.getContents()) {
+
 			this.propnet.getBasePropositions().get(sentence).setValue(true);
 		}
 	}

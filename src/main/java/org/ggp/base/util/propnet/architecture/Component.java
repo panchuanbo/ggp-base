@@ -42,6 +42,8 @@ public abstract class Component implements Serializable
     public boolean isInput() { return this.inputProposition; }
     public boolean previousValue() { return this.previousValue; }
     public void setPreviousValue(boolean b) { this.previousValue = b; }
+    public int numberOfInputs() { return inputs.length; }
+    public int numberOfOutputs() { return outputs.length; }
 
     /** Whether the value has been calculated or not */
     private boolean calculated;

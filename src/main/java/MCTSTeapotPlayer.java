@@ -23,14 +23,13 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 
 public class MCTSTeapotPlayer extends StateMachineGamer {
-
 	Player p;
 
 	private final static int CHARGES_PER_NODE = 5;
 	private final static int TIMEOUT_BUFFER = 2500; // 2500ms = 2.5s
 	private final static int BRIAN_C_FACTOR = 50; // tl;dr 2 != 100 (find paper to read)
-	private final static int NUMBER_OF_MAX_THREADS = 3;
-	private final static boolean MULTITHREADING_ENABLED = false;
+	private final static int NUMBER_OF_MAX_THREADS = 2;
+	private final static boolean MULTITHREADING_ENABLED = true;
 	private final static double NANOSECOND_IN_SECOND = 1000000000.0;
 	private final static boolean TESTING_SOMETHING = false;
 
@@ -57,6 +56,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	Node rootNode;
 
 	int depthCharges = 0;
+	int[] depthChargesMultithreading = new int[NUMBER_OF_MAX_THREADS];
 
 	@Override
 	public StateMachine getInitialStateMachine() {
@@ -75,7 +75,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		this.backupStateMachine = new ProverStateMachine();
 		this.backupStateMachine.initialize(rules);
 		for (int i = 0; i < NUMBER_OF_MAX_THREADS; i++) {
-			this.machines[i] = new FirstStepsPropnetStateMachine();
+			this.machines[i] = new HopefullyBetterPropnetStateMachineQuestionMark();
 			this.machines[i].initialize(rules);
 		}
 
@@ -110,6 +110,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		this.turn++;
 		this.depthCharges = 0;
 		selectTime = expandTime = depthChargeTime = backpropTime = 0;
+		for (int i = 0; i < NUMBER_OF_MAX_THREADS; i++) depthChargesMultithreading[i] = 0;
 
 //		System.out.println("CURRENT: " + getCurrentState());
 //		System.out.println("__STATE: " + rootNode.state);
@@ -184,19 +185,22 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 				if (n.finishedComputing) {
 					bestUtility = n.actual_utility;
 					bestAction = actions.get(i);
-					level = n.level;
+//					level = n.level;
 					System.out.println("Finished computing the subtree...");
 				} else {
 					if (n.visits != 0 && n.utility / n.visits > bestUtility) {
 						bestUtility = n.utility / n.visits;
 						bestAction = actions.get(i);
-						level = n.level;
+//						level = n.level;
 					}
 				}
 			} else {
 				System.out.println("WE ARE NOT EXPANDING CORRECTLY");
 			}
 		}
+
+		if (MULTITHREADING_ENABLED) this.depthCharges = 0;
+		for (int i = 0; i < NUMBER_OF_MAX_THREADS; i++) this.depthCharges += this.depthChargesMultithreading[i];
 
 		System.out.println("(Depth Charges: " + this.depthCharges + ") (MCTS Loops: " + loops_ran + ")" + "Best Action: " + bestAction + " Score: " + bestUtility + " Depth: " + (this.rootNode.level - level));
 		System.out.println("Select Time: " + this.selectTime/NANOSECOND_IN_SECOND + " | Expand Time: " + this.expandTime/NANOSECOND_IN_SECOND + " | DC Time: " + this.depthChargeTime/NANOSECOND_IN_SECOND + " | Backprop Time: " + this.backpropTime/NANOSECOND_IN_SECOND);
@@ -292,12 +296,11 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 			if (MULTITHREADING_ENABLED) {
 				start = System.nanoTime();
 				List<Future<Double>> results = executor.invokeAll(Arrays.asList(
-						new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[0])
-						, new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[1])
+						new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[0], 0)
+						, new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[1], 1)
 						//, new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[2])
 				));
 				for (Future<Double> f : results) {
-					this.depthCharges += CHARGES_PER_NODE;
 					backpropagate(result, f.get());
 				}
 				this.backpropTime += (System.nanoTime() - start);
@@ -315,12 +318,11 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 				if (MULTITHREADING_ENABLED) {
 					start = System.nanoTime();
 					List<Future<Double>> results = executor.invokeAll(Arrays.asList(
-							new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[0])
-							, new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[1])
+							new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[0], 0)
+							, new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[1], 1)
 							//, new DepthCharger(getRole(), result, CHARGES_PER_NODE, machines[2])
 					));
 					for (Future<Double> f : results) {
-						this.depthCharges += CHARGES_PER_NODE;
 						backpropagate(result, f.get());
 					}
 					this.backpropTime += (System.nanoTime() - start);
@@ -522,6 +524,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		private Node node;
 		private double count;
 		private StateMachine machine;
+		private int index = 0;
 
 		private double simulateDepthCharge(Role role, Node node, double count) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 			double total = 0, i = 0;
@@ -533,17 +536,19 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		}
 
 		private int depthCharge(Role role, MachineState state) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+			depthChargesMultithreading[this.index]++;
 			while (!machine.isTerminal(state)) {
 				state = machine.getNextState(state, machine.getRandomJointMove(state));
 			}
 			return machine.getGoal(state, role);
 		}
 
-		public DepthCharger(Role role, Node node, double count, StateMachine machine) {
+		public DepthCharger(Role role, Node node, double count, StateMachine machine, int index) {
 			this.role = role;
 			this.node = node;
 			this.count = count;
 			this.machine = machine;
+			this.index = index;
 //			System.out.println(role + " " + count + " " + machine);
 		}
 
