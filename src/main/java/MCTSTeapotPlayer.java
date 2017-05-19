@@ -29,7 +29,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	private final static int TIMEOUT_BUFFER = 2500; // 2500ms = 2.5s
 	private final static int BRIAN_C_FACTOR = 50; // tl;dr 2 != 100 (find paper to read)
 	private final static int NUMBER_OF_MAX_THREADS = 2;
-	private final static boolean MULTITHREADING_ENABLED = true;
+	private final static boolean MULTITHREADING_ENABLED = false;
 	private final static double NANOSECOND_IN_SECOND = 1000000000.0;
 	private final static boolean TESTING_SOMETHING = false;
 
@@ -177,21 +177,26 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 			if (rootNode.finishedComputing) break;
 		}
 
-		int level = 0;
+		System.out.println("Move Results: ");
 		for (int i = 0; i < actions.size(); i++) {
 			Node n = rootNode.children[i];
 			if (n != null) {
-				if (n.finishedComputing && n.actual_utility == 100) return n.action;
+				if (n.finishedComputing && n.actual_utility == 100) {
+					System.out.println("Solved: " + actions.get(i));
+					return n.action;
+				}
 				if (n.finishedComputing) {
-					bestUtility = n.actual_utility;
-					bestAction = actions.get(i);
-//					level = n.level;
-					System.out.println("Finished computing the subtree...");
+					System.out.println("\t" + n.action + ": " + n.actual_utility);
+					if (n.actual_utility > bestUtility) {
+						bestUtility = n.actual_utility;
+						bestAction = actions.get(i);
+						System.out.println("Finished computing the subtree...");
+					}
 				} else {
+					System.out.println("\t" + n.action + ": " + n.utility / ((n.visits == 0) ? 1 : n.visits));
 					if (n.visits != 0 && n.utility / n.visits > bestUtility) {
 						bestUtility = n.utility / n.visits;
 						bestAction = actions.get(i);
-//						level = n.level;
 					}
 				}
 			} else {
@@ -202,7 +207,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		if (MULTITHREADING_ENABLED) this.depthCharges = 0;
 		for (int i = 0; i < NUMBER_OF_MAX_THREADS; i++) this.depthCharges += this.depthChargesMultithreading[i];
 
-		System.out.println("(Depth Charges: " + this.depthCharges + ") (MCTS Loops: " + loops_ran + ")" + "Best Action: " + bestAction + " Score: " + bestUtility + " Depth: " + (this.rootNode.level - level));
+		System.out.println("(Depth Charges: " + this.depthCharges + ") (MCTS Loops: " + loops_ran + ")" + "Best Action: " + bestAction + " Score: " + bestUtility + " Depth: " + (this.level - this.rootNode.level));
 		System.out.println("Select Time: " + this.selectTime/NANOSECOND_IN_SECOND + " | Expand Time: " + this.expandTime/NANOSECOND_IN_SECOND + " | DC Time: " + this.depthChargeTime/NANOSECOND_IN_SECOND + " | Backprop Time: " + this.backpropTime/NANOSECOND_IN_SECOND);
 
 		return bestAction;
@@ -271,16 +276,10 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 
 		start = System.nanoTime();
 		Node selectedNode = select(node);
-		if (getStateMachine().isTerminal(selectedNode.state)) {
-//			System.out.println("Found Terminal: " + selectedNode.state);
-			selectedNode.finishedComputing = true;
-			//sketchy - is not sure what to do here --> well, jeffrey says it's okay;
+		if (selectedNode.finishedComputing || getStateMachine().isTerminal(selectedNode.state)) {
+//			System.out.println("Backprop Finished Node");
 			if (reachingTimeout()) return;
-			if (selectedNode.visits == 0) {
-				backpropagate(selectedNode, getStateMachine().findReward(getRole(), selectedNode.state));
-			} else {
-				backpropagate(selectedNode, selectedNode.utility/selectedNode.visits);
-			}
+			this.backpropagate(selectedNode, selectedNode.actual_utility);
 			this.selectTime += (System.nanoTime() - start);
 			return;
 		}
@@ -345,39 +344,21 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 
 	private Node select(Node node) {
 		if (getStateMachine().isTerminal(node.state) || node.finishedComputing) return node;
+//		if (getStateMachine().isTerminal(node.state)) return node;
 		if (node.visits == 0) return node;
 		if (node.children == null || node.expandedUpTo != node.children.length) return node;
 
 		double score = Double.NEGATIVE_INFINITY;
 		Node result = node;
 		for (Node n : node.children) {
-			double newScore = (!n.finishedComputing) ? selectfn(n) : n.actual_utility;
-			if (newScore >= score) {
-				score = newScore; result = n;
-			}
-		}
-
-		return select(result);
-		/*
-		if (node.expandedUpTo != node.children.length) return node;
-		if (node.visits == 0) return node;
-		if (getStateMachine().isTerminal(node.state)) return node;
-
-		//node.children is our legal immediate moves
-		for (Node n : node.children) if (n.visits == 0) return n;
-
-		double score = 0;
-		Node result = node;
-		for (Node n : node.children) {
+//			double newScore = (!n.finishedComputing) ? selectfn(n) : n.actual_utility;
 			double newScore = selectfn(n);
-			// System.out.println("New Score: " + newScore + " | Old Score: " + score);
 			if (newScore >= score) {
 				score = newScore; result = n;
 			}
 		}
 
 		return select(result);
-		*/
 	}
 
 	private Node expand(Node node) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
@@ -410,30 +391,13 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		node.children[expandedUpTo].expandedUpTo++;
 		if (node.children[expandedUpTo].expandedUpTo == node.children[expandedUpTo].children.length) node.expandedUpTo++;
 		if (machine.isTerminal(nextState)) {
+			int score = machine.getGoal(nextState, getRole());
+//			System.out.println("Terminal State with Score: " + score);
 			node.children[expandedUpTo].children[childExpandedUpTo].finishedComputing = true;
-			node.children[expandedUpTo].children[childExpandedUpTo].actual_utility = machine.getGoal(nextState, getRole());
+			node.children[expandedUpTo].children[childExpandedUpTo].actual_utility = score;
 		}
 
 		return node.children[expandedUpTo].children[childExpandedUpTo];
-		/*
-		StateMachine machine = getStateMachine();
-		List<Move> actions = machine.findLegals(getRole(), node.state);
-		if (node.children == null) node.children = new Node[actions.size()];
-		if (node.action == null) {
-			for (int i = 0; i < actions.size(); i++) {
-				Node newNode = makeNode(node, node.state, !node.maxnode, actions.get(i));
-				node.children[i] = newNode;
-			}
-		} else {
-			List<List<Move>> jointMoves = machine.getLegalJointMoves(node.state, getRole(), node.action);
-			node.children = new Node[jointMoves.size()];
-			for (int i = 0; i < jointMoves.size(); i++) {
-				MachineState nextState = machine.getNextState(node.state, jointMoves.get(i));
-				Node newNode = makeNode(node, nextState, !node.maxnode, null);
-				node.children[i] = newNode;
-			}
-		}
-		*/
 	}
 
 	private double simulateDepthCharge(Role role, Node node, double count) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
@@ -463,12 +427,13 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 			parent.finishedChildren.set(node.indexInParent, node.finishedComputing);
 			if (parent.finishedChildren.cardinality() == parent.children.length) {
 				parent.finishedComputing = true;
+//				System.out.println("Solved...");
 				if (parent.maxnode) {
 					double maxval = 0;
 					for (Node n : parent.children) {
 						if (n.actual_utility > maxval) maxval = n.actual_utility;
 					}
-//					System.out.println("maxval: " + maxval);
+//					System.out.println("maxval: " + maxval + " | num childs: " + parent.children.length + " | level: " + parent.level + " | pos: " + parent.indexInParent);
 					parent.actual_utility = maxval;
 				} else {
 					double minval = 100;
@@ -478,17 +443,11 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 //					System.out.println("minval: " + minval + " | num childs: " + parent.children.length + " | level: " + parent.level + " | pos: " + parent.indexInParent);
 					parent.actual_utility = minval;
 				}
-				score = parent.actual_utility;
+//				score = parent.actual_utility;
 			}
 			node = parent;
 
 		}
-//		while (node != null) {
-//			node.visits++;
-//			node.utility += score;
-//			// node.scores.add(score);
-//			node = node.parent;
-//		}
 	}
 
 	private double selectfn(Node node) {
@@ -496,15 +455,18 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		if (this.turn >= this.decayValues.length) decay = this.decayValues[99];
 		else decay = this.decayValues[this.turn];
 
-		if (node.maxnode) return node.utility/node.visits + decay * BRIAN_C_FACTOR * Math.sqrt(Math.log(node.parent.visits)/node.visits);
+		double avgUtility = (node.finishedComputing) ? node.actual_utility : node.utility/node.visits;
+
+		if (node.maxnode) return avgUtility + decay * BRIAN_C_FACTOR * Math.sqrt(Math.log(node.parent.visits)/node.visits);
 		else {
-			return -node.utility/node.visits + decay * BRIAN_C_FACTOR * Math.sqrt(Math.log(node.parent.visits)/node.visits);
+			return -avgUtility + decay * BRIAN_C_FACTOR * Math.sqrt(Math.log(node.parent.visits)/node.visits);
 		}
 	}
 
 	private Node makeNode(Node parent, MachineState state, boolean maxnode, Move action) {
 		Node newNode = new Node(parent, state, maxnode, action);
 		if (parent != null) newNode.level = parent.level + 1;
+		if (newNode.level > this.level) this.level = newNode.level;
 		else newNode.level = 0;
 		return newNode;
 	}

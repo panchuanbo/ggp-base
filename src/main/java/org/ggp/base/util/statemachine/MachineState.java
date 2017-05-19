@@ -1,5 +1,6 @@
 package org.ggp.base.util.statemachine;
 
+import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -8,6 +9,7 @@ import org.ggp.base.util.gdl.grammar.GdlSentence;
 public class MachineState {
     public MachineState() {
         this.contents = null;
+        this.activeBits = null;
     }
 
     /**
@@ -19,6 +21,7 @@ public class MachineState {
     public MachineState(Set<GdlSentence> contents)
     {
         this.contents = contents;
+        this.activeBits = null;
     }
 
     /**
@@ -30,6 +33,20 @@ public class MachineState {
     {
         return contents;
     }
+
+    /**
+     * I mean, why not let it hold the propositions as well? worth a try I guess...
+     */
+    private final BitSet activeBits;
+    public MachineState(Set<GdlSentence> contents, BitSet activeBits) {
+    	this.contents = contents;
+    	this.activeBits = activeBits;
+    }
+
+    public BitSet getPropContents() {
+    	return activeBits;
+    }
+
 
     @Override
     public MachineState clone() {

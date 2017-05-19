@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,10 +35,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 	private Proposition[] basePropositions;
 	private Proposition[] inputPropositions;
 	private ArrayList<Map<GdlTerm, GdlSentence>> inputMap;
-
-//	private int[] inputsPerRole;
-//	private int[] mapToBetterInputMap;
-//	private GdlSentence[] betterInputMap;
+	private Map<Role, Proposition[]> legalPropositions;
 
 	@Override
 	public List<Move> findActions(Role role) throws MoveDefinitionException {
@@ -57,6 +55,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 			for (Component c : this.propnet.getComponents()) c.crystalize();
 			this.basePropositions = new Proposition[this.propnet.getBasePropositions().size()];
 			this.inputPropositions = new Proposition[this.propnet.getInputPropositions().size()];
+			this.legalPropositions = new HashMap<>();
 
 			List<Proposition> bases = new ArrayList<Proposition>(this.propnet.getBasePropositions().values());
 			for (int i = 0; i < this.basePropositions.length; i++) {
@@ -70,29 +69,19 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 				this.inputPropositions[i].setInput(true);
 			}
 
-//			this.inputsPerRole = new int[this.roles.size()];
-//			int total = 0;
-//			for (int i = 0; i < this.roles.size(); i++) {
-//				int sz = this.propnet.getLegalPropositions().get(roles.get(i)).size();
-//				this.inputsPerRole[i] = sz;
-//				total += sz;
-//			}
-//			this.mapToBetterInputMap = new int[total];
-//			this.betterInputMap = new GdlSentence[total];
-//
-//			for (int i = 0; i < this.roles.size(); i++) {
-//				Role r = this.roles.get(i);
-//				Set<Proposition> moves = this.propnet.getLegalPropositions().get(r);
-//				Map<GdlTerm, GdlSentence> buf = new HashMap<>();
-//				for (Proposition p : moves) {
-//					GdlSentence moveSentence = ProverQueryBuilder.toDoes(r, new Move(p.getName().get(1)));
-//					buf.put(p.getName().get(1), moveSentence);
-////					System.out.println("key: " + p.getName().get(1) + " | value: " + moveSentence);
-//				}
-//			}
-//
-			this.inputMap = new ArrayList<>();
+			Map<Role, Set<Proposition>> legalprops = this.propnet.getLegalPropositions();
+			for (Role r : this.roles) {
+				Set<Proposition> legals = legalprops.get(r);
+				Proposition[] ps = new Proposition[legals.size()];
+				int i = 0;
+				for (Proposition p : legals) {
+					ps[i] = p;
+					i++;
+				}
+				this.legalPropositions.put(r, ps);
+			}
 
+			this.inputMap = new ArrayList<>();
 			for (Role r : this.roles) {
 				Set<Proposition> moves = this.propnet.getLegalPropositions().get(r);
 				Map<GdlTerm, GdlSentence> buf = new HashMap<>();
@@ -145,19 +134,25 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 		for (Component c : this.propnet.getComponents()) {
 			if ((c instanceof And)) ((And) c).useFastMethod = true;
 			if ((c instanceof Or)) ((Or) c).useFastMethod = true;
+			if ((c instanceof Transition)) ((Transition) c).useFastMode = true;
 			c.setPreviousValue(false);
 		}
 		for (Component c : this.propnet.getComponents()) if ((c instanceof Not)) forwardprop(c);
 		forwardprop(this.propnet.getInitProposition());
 
 		Set<GdlSentence> state = new HashSet<GdlSentence>();
-		for (Proposition base : this.basePropositions) {
-			if (base.fasterGetSingleInput().getValue()) state.add(base.getName());
+		BitSet activeStates = new BitSet(this.basePropositions.length);
+		for (int i = 0; i < this.basePropositions.length; i++) {
+			boolean val = this.basePropositions[i].fasterGetSingleInput().getValue();
+			activeStates.set(i, val);
+			if (val) {
+				state.add(this.basePropositions[i].getName());
+			}
 		}
-//		for (Component c : this.propnet.getComponents()) c.setPreviousValue(c.getValue());
 		System.out.println("INITIAL STATE VALUES: " + state);
 		this.propnet.getInitProposition().setValue(false);
-		return new MachineState(state);
+		forwardprop(this.propnet.getInitProposition());
+		return new MachineState(state, activeStates);
 	}
 
 	@Override
@@ -165,7 +160,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 		this.markbases(state);
 		for (Component c : this.basePropositions) forwardprop(c);
 //		for (Component c : this.propnet.getComponents()) c.setPreviousValue(c.getValue());
-		Set<Proposition> legalProps = this.propnet.getLegalPropositions().get(role);
+		Proposition[] legalProps = this.legalPropositions.get(role);
 		ArrayList<Move> moves = new ArrayList<Move>();
 		for (Proposition p : legalProps) {
 			if (p.getValue()) moves.add(this.getMoveFromProposition(p));
@@ -181,13 +176,19 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 		for (Component c : this.basePropositions) forwardprop(c);
 		for (Component c : this.inputPropositions) forwardprop(c);
 //		for (Component c : this.propnet.getComponents()) c.setPreviousValue(c.getValue());
+
 		Set<GdlSentence> gdlState = new HashSet<GdlSentence>();
-		for (Proposition base : this.basePropositions) {
-			if (base.fasterGetSingleInput().getValue()) gdlState.add(base.getName());
+		BitSet activeStates = new BitSet(this.basePropositions.length);
+		for (int i = 0; i < this.basePropositions.length; i++) {
+			boolean val = this.basePropositions[i].fasterGetSingleInput().getValue();
+			activeStates.set(i, val);
+			if (val) {
+				gdlState.add(this.basePropositions[i].getName());
+			}
 		}
 //		System.out.println("NEXT STATE VALUES: " + gdlState);
 
-		return new MachineState(gdlState);
+		return new MachineState(gdlState, activeStates);
 	}
 
 	// ----------------------------------------------
@@ -202,21 +203,29 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 				o.setPreviousValue(o.getValue());
 				((Proposition) o).setValue(c_val);
 			}
-			if ((o instanceof And)) ((And) o).counter += (c_val) ? 1 : -1;
-			if ((o instanceof Or)) ((Or) o).counter += (c_val) ? 1 : -1;
+			else if ((o instanceof And)) ((And) o).counter += (c_val) ? 1 : -1;
+			else if ((o instanceof Or)) ((Or) o).counter += (c_val) ? 1 : -1;
+			else if ((o instanceof Transition)) {
+				o.setPreviousValue(o.getValue());
+				((Transition) o).setValue(c_val);
+			}
 			forwardprop(o);
 		}
 	}
 
 	private void markbases(MachineState s) {
-		for (Proposition p : this.basePropositions) {
-			p.setPreviousValue(p.getValue());
-			p.setValue(false);
+		BitSet activeBits = s.getPropContents();
+		for (int i = 0; i < this.basePropositions.length; i++) {
+			this.basePropositions[i].setPreviousValue(this.basePropositions[i].getValue());
+			this.basePropositions[i].setValue(activeBits.get(i));
 		}
-		for (GdlSentence sentence : s.getContents()) {
-
-			this.propnet.getBasePropositions().get(sentence).setValue(true);
-		}
+//		for (Proposition p : this.basePropositions) {
+//			p.setPreviousValue(p.getValue());
+//			p.setValue(false);
+//		}
+//		for (GdlSentence sentence : s.getContents()) {
+//			this.propnet.getBasePropositions().get(sentence).setValue(true);
+//		}
 	}
 
 	private void markactions(List<Move> moves) {

@@ -21,6 +21,9 @@ public final class Or extends Component
 	{
 		if (useFastMethod) {
 			if (counter > 0) return true;
+//			if (counter > this.numberOfInputs() || counter < 0) {
+//				System.out.println("What the heck did I do wrong this time.");
+//			}
 			return false;
 		} else {
 			for ( Component component : getInputs() )

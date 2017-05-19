@@ -198,7 +198,7 @@ public class TeapotPlayer extends StateMachineGamer {
 		this.timeout = timeout - TIMEOUT_BUFFER;
 
 		this.turn++;
-		System.out.println("[" + getMatch().getGame().getName() + " | " + getMatch().getPlayerNamesFromHost() + "] (Turn " + this.turn + ") Score: " + machine.getGoal(getCurrentState(), getRole()) + " | State: " + getCurrentState());
+//		System.out.println("[" + getMatch().getGame().getName() + " | " + getMatch().getPlayerNamesFromHost() + "] (Turn " + this.turn + ") Score: " + machine.getGoal(getCurrentState(), getRole()) + " | State: " + getCurrentState());
 
 		// since we finished implementing joint legal moves, we can *technically* use only one type of player
 		if (roles.size() == 1) { // Use Complusive
@@ -321,7 +321,7 @@ public class TeapotPlayer extends StateMachineGamer {
 			}
 		}
 
-		System.out.println("Got to Depth: " + this.limit);
+//		System.out.println("Got to Depth: " + this.limit);
 
 		return bestAction;
 	}

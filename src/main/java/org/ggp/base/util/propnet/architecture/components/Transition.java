@@ -8,6 +8,9 @@ import org.ggp.base.util.propnet.architecture.Component;
 @SuppressWarnings("serial")
 public final class Transition extends Component
 {
+	public boolean useFastMode = false;
+	public boolean value = false;
+
 	/**
 	 * Returns the value of the input to the transition.
 	 *
@@ -16,8 +19,13 @@ public final class Transition extends Component
 	@Override
 	public boolean getValue()
 	{
+		if (useFastMode) {
+			return value;
+		}
 		return getSingleInput().getValue();
 	}
+
+	public void setValue(boolean b) { this.value = b; }
 
 	/**
 	 * @see org.ggp.base.util.propnet.architecture.Component#toString()
