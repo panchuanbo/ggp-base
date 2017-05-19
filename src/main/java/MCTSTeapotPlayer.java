@@ -351,7 +351,6 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		double score = Double.NEGATIVE_INFINITY;
 		Node result = node;
 		for (Node n : node.children) {
-//			double newScore = (!n.finishedComputing) ? selectfn(n) : n.actual_utility;
 			double newScore = selectfn(n);
 			if (newScore >= score) {
 				score = newScore; result = n;

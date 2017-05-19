@@ -131,7 +131,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 	@Override
 	public MachineState getInitialState() {
 		this.propnet.getInitProposition().setValue(true);
-		for (Component c : this.propnet.getComponents()) {
+		for (Component c : this.propnet.getComponents()) { // check what subclass of component
 			if ((c instanceof And)) ((And) c).useFastMethod = true;
 			if ((c instanceof Or)) ((Or) c).useFastMethod = true;
 			if ((c instanceof Transition)) ((Transition) c).useFastMode = true;

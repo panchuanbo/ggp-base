@@ -8,6 +8,7 @@ import org.ggp.base.util.propnet.architecture.Component;
 @SuppressWarnings("serial")
 public final class Not extends Component
 {
+
 	/**
 	 * Returns the inverse of the input to the not.
 	 *
