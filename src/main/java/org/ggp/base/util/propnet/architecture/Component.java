@@ -36,6 +36,8 @@ public abstract class Component implements Serializable
     /** previous value */
     boolean previousValue = false;
 
+    public int componentId = 0;
+
     public void setBase(boolean b) { this.baseProposition = b; }
     public void setInput(boolean b) { this.inputProposition = b; }
     public boolean isBase() { return this.baseProposition; }
