@@ -241,13 +241,6 @@ public class AnEvenBetterPropnetStateMachine extends StateMachine {
 			this.basePropositions[i].setPreviousValue(this.basePropositions[i].getValue());
 			this.basePropositions[i].setValue(activeBits.get(i));
 		}
-//		for (Proposition p : this.basePropositions) {
-//			p.setPreviousValue(p.getValue());
-//			p.setValue(false);
-//		}
-//		for (GdlSentence sentence : s.getContents()) {
-//			this.propnet.getBasePropositions().get(sentence).setValue(true);
-//		}
 	}
 
 	private void markactions(List<Move> moves) {
