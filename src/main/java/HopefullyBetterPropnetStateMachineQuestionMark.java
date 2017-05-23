@@ -14,6 +14,7 @@ import org.ggp.base.util.gdl.grammar.GdlTerm;
 import org.ggp.base.util.propnet.architecture.Component;
 import org.ggp.base.util.propnet.architecture.PropNet;
 import org.ggp.base.util.propnet.architecture.components.And;
+import org.ggp.base.util.propnet.architecture.components.Constant;
 import org.ggp.base.util.propnet.architecture.components.Not;
 import org.ggp.base.util.propnet.architecture.components.Or;
 import org.ggp.base.util.propnet.architecture.components.Proposition;
@@ -57,6 +58,11 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 			this.inputPropositions = new Proposition[this.propnet.getInputPropositions().size()];
 			this.legalPropositions = new HashMap<>();
 
+			for (Component c : this.propnet.getComponents()) {
+				if ((c instanceof Constant)) c.setPreviousValue(!c.getValue());
+				else c.setPreviousValue(false);
+			}
+
 			List<Proposition> bases = new ArrayList<Proposition>(this.propnet.getBasePropositions().values());
 			for (int i = 0; i < this.basePropositions.length; i++) {
 				this.basePropositions[i] = bases.get(i);
@@ -94,7 +100,7 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 			}
 			// System.out.println("input map: " + this.inputMap);
 			//System.out.println("Wrote propnet to disk.");
-//			this.propnet.renderToFile("C:\\Users\\panch\\Desktop\\connect4.dot");
+			this.propnet.renderToFile("C:\\Users\\panch\\Desktop\\buttons.dot");
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -130,15 +136,18 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 
 	@Override
 	public MachineState getInitialState() {
-		this.propnet.getInitProposition().setValue(true);
 		for (Component c : this.propnet.getComponents()) { // check what subclass of component
 			if ((c instanceof And)) ((And) c).useFastMethod = true;
 			if ((c instanceof Or)) ((Or) c).useFastMethod = true;
 			if ((c instanceof Transition)) ((Transition) c).useFastMode = true;
-			c.setPreviousValue(false);
 		}
-		for (Component c : this.propnet.getComponents()) if ((c instanceof Not)) forwardprop(c);
-		forwardprop(this.propnet.getInitProposition());
+		for (Component c : this.propnet.getComponents()) if ((c instanceof Constant)) forwardprop(c);
+		Proposition initProp = this.propnet.getInitProposition();
+		if (initProp != null) {
+			this.propnet.getInitProposition().setValue(true);
+			for (Component c : this.propnet.getComponents()) if ((c instanceof Not)) forwardprop(c);
+			forwardprop(this.propnet.getInitProposition());
+		}
 
 		Set<GdlSentence> state = new HashSet<GdlSentence>();
 		BitSet activeStates = new BitSet(this.basePropositions.length);
@@ -150,8 +159,11 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 			}
 		}
 		System.out.println("INITIAL STATE VALUES: " + state);
-		this.propnet.getInitProposition().setValue(false);
-		forwardprop(this.propnet.getInitProposition());
+		if (initProp != null) {
+			this.propnet.getInitProposition().setValue(false);
+			forwardprop(this.propnet.getInitProposition());
+			System.out.println("Turning off init prop...");
+		}
 		return new MachineState(state, activeStates);
 	}
 
@@ -218,6 +230,9 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 		for (int i = 0; i < this.basePropositions.length; i++) {
 			this.basePropositions[i].setPreviousValue(this.basePropositions[i].getValue());
 			this.basePropositions[i].setValue(activeBits.get(i));
+//			if (activeBits.get(i)) {
+//				System.out.println("True: " + this.basePropositions[i].getName());
+//			}
 		}
 //		for (Proposition p : this.basePropositions) {
 //			p.setPreviousValue(p.getValue());
