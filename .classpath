@@ -20,6 +20,11 @@
 	<classpathentry kind="lib" path="lib/javassist/javassist.jar"/>
 	<classpathentry kind="lib" path="lib/reflections/reflections-0.9.9-RC1.jar"/>
 	<classpathentry kind="lib" path="lib/Htmlparser/htmlparser-1.4.jar"/>
-	<classpathentry kind="lib" path="C:/Users/panch/Documents/commons-math3-3.6.1.jar"/>
+	<classpathentry kind="lib" path="/Users/nidhi/Downloads/commons-math3-3.6.1/commons-math3-3.6.1-javadoc.jar"/>
+	<classpathentry kind="lib" path="/Users/nidhi/Downloads/commons-math3-3.6.1/commons-math3-3.6.1-sources.jar"/>
+	<classpathentry kind="lib" path="/Users/nidhi/Downloads/commons-math3-3.6.1/commons-math3-3.6.1-test-sources.jar"/>
+	<classpathentry kind="lib" path="/Users/nidhi/Downloads/commons-math3-3.6.1/commons-math3-3.6.1-tests.jar"/>
+	<classpathentry kind="lib" path="/Users/nidhi/Downloads/commons-math3-3.6.1/commons-math3-3.6.1-tools.jar"/>
+	<classpathentry kind="lib" path="/Users/nidhi/Downloads/commons-math3-3.6.1/commons-math3-3.6.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

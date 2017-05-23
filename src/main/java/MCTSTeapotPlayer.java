@@ -28,8 +28,8 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	private final static int CHARGES_PER_NODE = 5;
 	private final static int TIMEOUT_BUFFER = 2500; // 2500ms = 2.5s
 	private final static int BRIAN_C_FACTOR = 50; // tl;dr 2 != 100 (find paper to read)
-	private final static int NUMBER_OF_MAX_THREADS = 2;
-	private final static boolean MULTITHREADING_ENABLED = false;
+	private final static int NUMBER_OF_MAX_THREADS = 3;
+	private final static boolean MULTITHREADING_ENABLED = true;
 	private final static double NANOSECOND_IN_SECOND = 1000000000.0;
 	private final static boolean TESTING_SOMETHING = false;
 
@@ -40,7 +40,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	int turn = 0;
 	int level = 0;
 
-	// c-value decay
+	// c-value decay - the importance of the exploration in the select function decays exponentially
 	double[] decayValues;
 
 	// stores time spent in each step of MCTS (debugging)
@@ -49,12 +49,19 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	// stores the current game thread [not in use]
 	Thread gameSearcherThread;
 
+	// 	TO DO: multiplayer factoring might want multiple game threads here, make a function to start more threads....
+	//
+	//
+	//
+
+
 	// debugging
 	StateMachine backupStateMachine;
 
 	// keep track of the root node
 	Node rootNode;
 
+	// Keep track of the number of depth charges being made
 	int depthCharges = 0;
 	int[] depthChargesMultithreading = new int[NUMBER_OF_MAX_THREADS];
 
@@ -63,8 +70,8 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 //		return new CachedStateMachine(new ProverStateMachine());
 //		return new CachedStateMachine(new BabyPropnetStateMachine());
 //		return new CachedStateMachine(new FirstStepsPropnetStateMachine());
-//		return new FirstStepsPropnetStateMachine();
-		return new HopefullyBetterPropnetStateMachineQuestionMark();
+		return new FirstStepsPropnetStateMachine();
+//		return new HopefullyBetterPropnetStateMachineQuestionMark();
 	}
 
 	@Override
@@ -74,6 +81,10 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		List<Gdl> rules = getMatch().getGame().getRules();
 		this.backupStateMachine = new ProverStateMachine();
 		this.backupStateMachine.initialize(rules);
+
+		//  WHAT DOES BACKUP STATE MACHINE DO????
+
+		// WHY ARE YOU USING MULTIPLE GAMES
 		for (int i = 0; i < NUMBER_OF_MAX_THREADS; i++) {
 			this.machines[i] = new HopefullyBetterPropnetStateMachineQuestionMark();
 			this.machines[i].initialize(rules);
@@ -84,8 +95,10 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 			this.decayValues[i-1] = 1/(Math.pow(i, 0.25));
 		}
 
+		// Initialize the root node
 		rootNode = makeNode(null, getCurrentState(), true, null);
 		System.out.println("\nMetagame Initial State: " + getCurrentState());
+
 		while (System.currentTimeMillis() < timeout - TIMEOUT_BUFFER) {
 			try {
 				runMCTS(rootNode);
@@ -211,24 +224,21 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		System.out.println("Select Time: " + this.selectTime/NANOSECOND_IN_SECOND + " | Expand Time: " + this.expandTime/NANOSECOND_IN_SECOND + " | DC Time: " + this.depthChargeTime/NANOSECOND_IN_SECOND + " | Backprop Time: " + this.backpropTime/NANOSECOND_IN_SECOND);
 
 		return bestAction;
-	}
+	} // end of stateMachineSelectMove
 
 	@Override
 	public void stateMachineStop() {
 		// TODO Auto-generated method stub
-
 	}
 
 	@Override
 	public void stateMachineAbort() {
 		// TODO Auto-generated method stub
-
 	}
 
 	@Override
 	public void preview(Game g, long timeout) throws GamePreviewException {
 		// TODO Auto-generated method stub
-
 	}
 
 	@Override
@@ -244,17 +254,16 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		Node parent = null;
 		Move action = null;
 		MachineState state = null;
-		int indexInParent = 0;
 
+		int indexInParent = 0;
 		boolean maxnode; //true if maxnode, false if min-node
 		boolean finishedComputing = false;
-
 		int visits = 0;
-		double utility = 0; //sum of the goal values of the terminal states we visit in depth-charges from this node
-		double actual_utility = 0;
+		double utility = 0; //sum of all the goal values of the terminal states we visit in depth-charges from this node
+		double actual_utility = 0; // populate with actual terminal value of node
 
-		int expandedUpTo = 0; // node we've expanded up too
-		BitSet finishedChildren;
+		int expandedUpTo = 0; // node (level below current one) we've expanded up too
+		BitSet finishedChildren; // 1 means completely explored/terminal node
 		Node[] children = null; //all the immediate states following this one
 
 		// debug data
@@ -263,7 +272,10 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 //		ArrayList<Double> scores = new ArrayList<Double>();
 		//constructor
 		public Node(Node parent, MachineState state, boolean maxnode, Move action) {
-			this.parent = parent; this.state = state; this.maxnode = maxnode; this.action = action;
+			this.parent = parent;
+			this.state = state;
+			this.maxnode = maxnode;
+			this.action = action;
 		}
 	}
 
@@ -340,7 +352,7 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 				this.backpropTime += (System.nanoTime() - start);
 			}
 		}
-	}
+	} // end of runMCTS
 
 	private Node select(Node node) {
 		if (getStateMachine().isTerminal(node.state) || node.finishedComputing) return node;
@@ -353,13 +365,14 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		for (Node n : node.children) {
 			double newScore = selectfn(n);
 			if (newScore >= score) {
-				score = newScore; result = n;
+				score = newScore;
+				result = n;
 			}
 		}
-
 		return select(result);
 	}
 
+	// returns the node to be expanded
 	private Node expand(Node node) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
 		int expandedUpTo = node.expandedUpTo;
 		StateMachine machine = getStateMachine();
@@ -415,7 +428,6 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 //		System.out.println("depth charge done: " + this.depthCharges);
 		return machine.getGoal(state, role);
 	}
-
 
 	private void backpropagate(Node node, double score) {
 		while (true) {
