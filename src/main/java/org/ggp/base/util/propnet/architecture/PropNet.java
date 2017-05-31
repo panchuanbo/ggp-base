@@ -104,6 +104,32 @@ public final class PropNet
 		if (c instanceof Proposition) propositions.add((Proposition)c);
 	}
 
+	/* Added for Factoring - to make copy of propnet */
+	@Override
+	public PropNet clone() throws CloneNotSupportedException{
+		return (PropNet) super.clone();
+//		Object o = null;
+//		try {
+//			o = super.clone(); // everything in java is referenced
+//		} catch (CloneNotSupportedException ex) {
+//			throw new Error("Cannot clone the propnet. ");
+//		}
+//		return o;
+	}
+
+//	public PropNet getCloneOfPropnet() {
+//		PropNet p = null;
+//		try {
+//			p = this.clone();
+//		} catch (CloneNotSupportedException exc) {
+//			exc.printStackTrace();
+//			return null;
+//		}
+//		return p;
+//	}
+//	/* End of added factoring code - to make copy of propnet */
+
+
 	/**
 	 * Creates a new PropNet from a list of Components, along with indices over
 	 * those components.

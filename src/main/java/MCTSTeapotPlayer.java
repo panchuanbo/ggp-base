@@ -28,10 +28,11 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	private final static int CHARGES_PER_NODE = 5;
 	private final static int TIMEOUT_BUFFER = 2500; // 2500ms = 2.5s
 	private final static int BRIAN_C_FACTOR = 50; // tl;dr 2 != 100 (find paper to read)
-	private final static int NUMBER_OF_MAX_THREADS = 3;
-	private final static boolean MULTITHREADING_ENABLED = true;
+	private final static int NUMBER_OF_MAX_THREADS = 2;
+	private final static boolean MULTITHREADING_ENABLED = false;
 	private final static double NANOSECOND_IN_SECOND = 1000000000.0;
 	private final static boolean TESTING_SOMETHING = false;
+	private HopefullyBetterPropnetStateMachineQuestionMark PROPNET_STATEMACHINE = null;
 
 	// Stores the timeout (given timeout - buffer)
 	long timeout;
@@ -49,12 +50,6 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 	// stores the current game thread [not in use]
 	Thread gameSearcherThread;
 
-	// 	TO DO: multiplayer factoring might want multiple game threads here, make a function to start more threads....
-	//
-	//
-	//
-
-
 	// debugging
 	StateMachine backupStateMachine;
 
@@ -70,26 +65,110 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 //		return new CachedStateMachine(new ProverStateMachine());
 //		return new CachedStateMachine(new BabyPropnetStateMachine());
 //		return new CachedStateMachine(new FirstStepsPropnetStateMachine());
-		return new FirstStepsPropnetStateMachine();
+//		return new FirstStepsPropnetStateMachine();
 //		return new HopefullyBetterPropnetStateMachineQuestionMark();
+		PROPNET_STATEMACHINE = new HopefullyBetterPropnetStateMachineQuestionMark();
+		return PROPNET_STATEMACHINE;
 	}
 
 	@Override
 	public void stateMachineMetaGame(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+		// At this point the propnet has been built with the metagame
+
 		// setup multithreading machines
 		List<Gdl> rules = getMatch().getGame().getRules();
 		this.backupStateMachine = new ProverStateMachine();
 		this.backupStateMachine.initialize(rules);
 
-		//  WHAT DOES BACKUP STATE MACHINE DO????
 
-		// WHY ARE YOU USING MULTIPLE GAMES
+
+//		/* Beginning of the factoring for MCTS */
+//		//PropNet p = PROPNET_STATEMACHINE.getPropnet();
+//		Set<Proposition> setPropositions = null;
+//		Map<Role, Set<Proposition>> mapGoalPropositions = null;
+//		Proposition terminalProp = null;
+//
+//		// Make a collection of pointers to all the propositions in the propnet
+//		//	- ignore terminal and goal propositions
+//		//	- ignore AND, CONSTANT, NOT, OR, TRANSITION after the propositions
+//		// Get all propositions in propnet (except goal and terminal propositions) and make setPropositions
+//		setPropositions = PROPNET_STATEMACHINE.propnet.getPropositions();
+//		terminalProp = PROPNET_STATEMACHINE.propnet.getTerminalProposition();
+//
+//		for (Proposition prop : setPropositions ) {
+//			GdlSentence name = prop.getName();
+//			//if (prop == terminalProp) {
+//				// Assume that there is only 1 terminal proposition
+//				// Do I have to make other nodes in the subtrees the terminal one?
+//				//setPropositions.remove(prop);
+//			//}
+//			// Remove goal propositions of all users
+//			for (Set<Proposition> mapGoalProposition : mapGoalPropositions.values()) {
+//				if(mapGoalPropositions.containsKey(name)) {
+//					setPropositions.remove(prop);
+//				}
+//			}
+//		}
+//
+//		// Comments and Concerns
+//		// Why exactly must the goal propositions be removed? Draw it out.
+//		// Do I have to make other nodes in the subtrees the terminal one?
+//		// No topological sort of nodes: we will just search for nodes with linear search and maybe add to separate propnets?
+//
+//		Set<Proposition> setOfConnectComps = null; // pointers to the head propositions of each connected component
+//		int numConnectedComps = 0;
+//
+//		// Populate a setOfConnectComps
+//		Proposition propToStartAt = terminalProp;
+//		while (!setPropositions.isEmpty()) {
+//			// pick next terminal node in the setProposition
+//			Proposition ptrToProposition = setPropositions[0];
+//			setPropositions.remove(ptrToProposition);
+//
+//			for(Component parent : c.getInputs())
+//			// Run DFS on this node
+//				- if another node is connected to it, remove that pointer from the setPropositionPtrs
+//				- add this node to the setOfConnectComp
+//				numConnectedComps++;
+//
+//				set all the
+//				//propToStartAt = next terminal node...
+//
+//		}
+//
+//		// For each connected component, treat as separate game and run on own MCTS thread
+////		for (int i = 0; i < numConnectedComps; i++) {
+////			// Make a new thread
+////			// Initialize a machine and run MCTS on this thread
+////
+////		}
+//
+//		// Make separate propnets: might want to use:
+//		//		for(Component parent : c.getInputs())
+//		//			parent.removeOutput(c);
+//		//		for(Component child : c.getOutputs())
+//		//			child.removeInput(c);
+//
+//		//	Pass propnet and rootNode (currentstate) into the runMCTS
+//
+//
+		/* End of the factoring for MCTS */
+
 		for (int i = 0; i < NUMBER_OF_MAX_THREADS; i++) {
 			this.machines[i] = new HopefullyBetterPropnetStateMachineQuestionMark();
 			this.machines[i].initialize(rules);
+
+
+
+
+
 		}
 
+		// Set up decay over time that will exponentially decrease the importance
+		// 	that we give to the exploration factor in the select function.
+		//	The select function wants to maximize exploitation (nodes with high utilities)
+		//	and look at unexplored nodes.
 		this.decayValues = new double[100];
 		for (int i = 1; i <= this.decayValues.length; i++) {
 			this.decayValues[i-1] = 1/(Math.pow(i, 0.25));
@@ -99,6 +178,8 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		rootNode = makeNode(null, getCurrentState(), true, null);
 		System.out.println("\nMetagame Initial State: " + getCurrentState());
 
+		// Runs MCTS
+		// For teh independent games in factoring, we want to runMCTS on each thread/game
 		while (System.currentTimeMillis() < timeout - TIMEOUT_BUFFER) {
 			try {
 				runMCTS(rootNode);
@@ -218,7 +299,8 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		}
 
 		if (MULTITHREADING_ENABLED) this.depthCharges = 0;
-		for (int i = 0; i < NUMBER_OF_MAX_THREADS; i++) this.depthCharges += this.depthChargesMultithreading[i];
+		for (int i = 0; i < NUMBER_OF_MAX_THREADS; i++)
+			this.depthCharges += this.depthChargesMultithreading[i];
 
 		System.out.println("(Depth Charges: " + this.depthCharges + ") (MCTS Loops: " + loops_ran + ")" + "Best Action: " + bestAction + " Score: " + bestUtility + " Depth: " + (this.level - this.rootNode.level));
 		System.out.println("Select Time: " + this.selectTime/NANOSECOND_IN_SECOND + " | Expand Time: " + this.expandTime/NANOSECOND_IN_SECOND + " | DC Time: " + this.depthChargeTime/NANOSECOND_IN_SECOND + " | Backprop Time: " + this.backpropTime/NANOSECOND_IN_SECOND);
@@ -511,7 +593,13 @@ public class MCTSTeapotPlayer extends StateMachineGamer {
 		private int depthCharge(Role role, MachineState state) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 			depthChargesMultithreading[this.index]++;
 			while (!machine.isTerminal(state)) {
-				state = machine.getNextState(state, machine.getRandomJointMove(state));
+				//try {
+					state = machine.getNextState(state, machine.getRandomJointMove(state));
+				/*} catch (IllegalArgumentException ex){
+					System.out.println("State is: " + state);
+					System.out.println("Exception: " + ex);
+
+				}*/
 			}
 			return machine.getGoal(state, role);
 		}

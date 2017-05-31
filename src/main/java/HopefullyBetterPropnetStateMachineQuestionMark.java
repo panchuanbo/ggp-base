@@ -29,9 +29,9 @@ import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import org.ggp.base.util.statemachine.implementation.prover.query.ProverQueryBuilder;
 
-public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine {
+public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine implements Cloneable {
 
-	private PropNet propnet;
+	public PropNet propnet;
 	private List<Role> roles;
 	private Proposition[] basePropositions;
 	private Proposition[] inputPropositions;
@@ -47,6 +47,15 @@ public class HopefullyBetterPropnetStateMachineQuestionMark extends StateMachine
 		}
 		return legalMoves;
 	}
+
+
+//	/* Added for Factoring - to make copy of propnet */
+//	public PropNet getPropnet() {
+//		return this.propnet.getCloneOfPropnet();
+//		//return this.propnet;
+//	}
+//	/* End of added factoring code - to make copy of propnet */
+
 
 	@Override
 	public void initialize(List<Gdl> description) {
