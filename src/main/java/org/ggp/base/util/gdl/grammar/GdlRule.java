@@ -78,4 +78,25 @@ public final class GdlRule extends Gdl
 		return sb.toString();
 	}
 
+	@Override
+	public String infixString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(head.infixString() + " :- ");
+		for (GdlLiteral literal : body) {
+			sb.append(literal.infixString() + ",");
+		}
+		if (sb.charAt(sb.length() - 1) == ',') sb.deleteCharAt(sb.length() - 1);
+		return sb.toString();
+	}
+
+	@Override
+	public String toASPString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(head.toASPString() + " :- ");
+		for (GdlLiteral literal : body) {
+			sb.append(literal.toASPString() + ",");
+		}
+		if (sb.charAt(sb.length() - 1) == ',') sb.deleteCharAt(sb.length() - 1);
+		return sb.toString();
+	}
 }

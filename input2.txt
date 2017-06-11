@@ -1,0 +1,152 @@
+role(left).
+role(right).
+base(step(1)).
+true(location(left,a),1).
+true(visited(left,a),1).
+true(score(left,5),1).
+true(location(right,a),1).
+true(visited(right,a),1).
+true(score(right,5),1).
+true(step(1),1).
+node(a,T) :- time(T).
+node(b,T) :- time(T).
+node(c,T) :- time(T).
+node(d,T) :- time(T).
+node(e,T) :- time(T).
+node(f,T) :- time(T).
+node(g,T) :- time(T).
+node(h,T) :- time(T).
+node(i,T) :- time(T).
+node(j,T) :- time(T).
+node(k,T) :- time(T).
+node(l,T) :- time(T).
+node(m,T) :- time(T).
+node(n,T) :- time(T).
+node(o,T) :- time(T).
+node(p,T) :- time(T).
+node(q,T) :- time(T).
+node(r,T) :- time(T).
+node(s,T) :- time(T).
+node(t,T) :- time(T).
+connected(a,b,T) :- time(T).
+connected(a,e,T) :- time(T).
+connected(a,h,T) :- time(T).
+connected(b,a,T) :- time(T).
+connected(b,c,T) :- time(T).
+connected(b,j,T) :- time(T).
+connected(c,b,T) :- time(T).
+connected(c,d,T) :- time(T).
+connected(c,l,T) :- time(T).
+connected(d,c,T) :- time(T).
+connected(d,e,T) :- time(T).
+connected(d,n,T) :- time(T).
+connected(e,a,T) :- time(T).
+connected(e,d,T) :- time(T).
+connected(e,f,T) :- time(T).
+connected(f,e,T) :- time(T).
+connected(f,g,T) :- time(T).
+connected(f,o,T) :- time(T).
+connected(g,f,T) :- time(T).
+connected(g,h,T) :- time(T).
+connected(g,q,T) :- time(T).
+connected(h,a,T) :- time(T).
+connected(h,g,T) :- time(T).
+connected(h,i,T) :- time(T).
+connected(i,h,T) :- time(T).
+connected(i,j,T) :- time(T).
+connected(i,r,T) :- time(T).
+connected(j,b,T) :- time(T).
+connected(j,i,T) :- time(T).
+connected(j,k,T) :- time(T).
+connected(k,j,T) :- time(T).
+connected(k,l,T) :- time(T).
+connected(k,s,T) :- time(T).
+connected(l,c,T) :- time(T).
+connected(l,k,T) :- time(T).
+connected(l,m,T) :- time(T).
+connected(m,l,T) :- time(T).
+connected(m,n,T) :- time(T).
+connected(m,t,T) :- time(T).
+connected(n,d,T) :- time(T).
+connected(n,m,T) :- time(T).
+connected(n,o,T) :- time(T).
+connected(o,n,T) :- time(T).
+connected(o,f,T) :- time(T).
+connected(o,p,T) :- time(T).
+connected(p,o,T) :- time(T).
+connected(p,q,T) :- time(T).
+connected(p,t,T) :- time(T).
+connected(q,g,T) :- time(T).
+connected(q,p,T) :- time(T).
+connected(q,r,T) :- time(T).
+connected(r,i,T) :- time(T).
+connected(r,q,T) :- time(T).
+connected(r,s,T) :- time(T).
+connected(s,k,T) :- time(T).
+connected(s,r,T) :- time(T).
+connected(s,t,T) :- time(T).
+connected(t,m,T) :- time(T).
+connected(t,s,T) :- time(T).
+connected(t,p,T) :- time(T).
+scorenext(0,5,T) :- time(T).
+scorenext(5,10,T) :- time(T).
+scorenext(10,15,T) :- time(T).
+scorenext(15,20,T) :- time(T).
+scorenext(20,25,T) :- time(T).
+scorenext(25,30,T) :- time(T).
+scorenext(30,35,T) :- time(T).
+scorenext(35,40,T) :- time(T).
+scorenext(40,45,T) :- time(T).
+scorenext(45,50,T) :- time(T).
+scorenext(50,55,T) :- time(T).
+scorenext(55,60,T) :- time(T).
+scorenext(60,65,T) :- time(T).
+scorenext(65,70,T) :- time(T).
+scorenext(70,75,T) :- time(T).
+scorenext(75,80,T) :- time(T).
+scorenext(80,85,T) :- time(T).
+scorenext(85,90,T) :- time(T).
+scorenext(90,95,T) :- time(T).
+scorenext(95,100,T) :- time(T).
+successor(1,2,T) :- time(T).
+successor(2,3,T) :- time(T).
+successor(3,4,T) :- time(T).
+successor(4,5,T) :- time(T).
+successor(5,6,T) :- time(T).
+successor(6,7,T) :- time(T).
+successor(7,8,T) :- time(T).
+successor(8,9,T) :- time(T).
+successor(9,10,T) :- time(T).
+successor(10,11,T) :- time(T).
+successor(11,12,T) :- time(T).
+successor(12,13,T) :- time(T).
+successor(13,14,T) :- time(T).
+successor(14,15,T) :- time(T).
+successor(15,16,T) :- time(T).
+successor(16,17,T) :- time(T).
+successor(17,18,T) :- time(T).
+successor(18,19,T) :- time(T).
+successor(19,20,T) :- time(T).
+base(location(VarR,VarX)) :- role(VarR),node(VarX,T), time(T).
+base(visited(VarR,VarX)) :- role(VarR),node(VarX,T), time(T).
+base(score(VarR,VarN)) :- role(VarR),scorenext(VarM,VarN,T), time(T).
+base(step(VarN)) :- successor(VarM,VarN,T), time(T).
+input(VarR,move(VarY)) :- role(VarR),node(VarY,T), time(T).
+legal(VarR,move(VarY),T) :- true(location(VarR,VarX),T),connected(VarX,VarY,T), time(T).
+true(location(VarR,VarY),T+1) :- does(VarR,move(VarY),T), time(T).
+true(visited(VarR,VarY),T+1) :- does(VarR,move(VarY),T), time(T).
+true(visited(VarR,VarY),T+1) :- true(visited(VarR,VarY),T), time(T).
+true(step(VarN),T+1) :- true(step(VarM),T),successor(VarM,VarN,T), time(T).
+goal(VarR,VarN,T) :- true(score(VarR,VarN),T), time(T).
+terminal(T) :- true(step(20),T), time(T).
+next_tmp1(VarR,T) :- does(VarR,move(VarY),T),not true(visited(VarR,VarY),T), time(T).
+true(score(VarR,VarN),T+1) :- true(score(VarR,VarM),T),scorenext(VarM,VarN,T),next_tmp1(VarR,T), time(T).
+next_tmp3(VarR,T) :- does(VarR,move(VarY),T),true(visited(VarR,VarY),T), time(T).
+true(score(VarR,VarN),T+1) :- true(score(VarR,VarN),T),next_tmp3(VarR,T), time(T).
+1 { does(R,M,T) : input(R,M) } 1 :- role(R), not terminated(T), time(T).
+terminated(T) :- terminal(T), time(T).
+terminated(T+1) :- terminated(T), time(T).
+:- does(R,M,T), not legal(R,M,T).
+:- 0 { terminated(T) : time(T) } 0.
+:- terminated(T), not terminated(T-1), role(R), not goal(R,100,T).
+time(1..100).

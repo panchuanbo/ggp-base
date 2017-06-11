@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.ggp.base.util.gdl.grammar.Gdl;
 import org.ggp.base.util.gdl.grammar.GdlConstant;
 import org.ggp.base.util.gdl.grammar.GdlPool;
 import org.ggp.base.util.gdl.grammar.GdlProposition;
@@ -97,6 +98,9 @@ public final class PropNet
 
 	/** A helper list of all of the roles. */
 	private final List<Role> roles;
+
+	/** Holds description for me to analyze */
+	public List<Gdl> processedGameDescription;
 
 	public void addComponent(Component c)
 	{

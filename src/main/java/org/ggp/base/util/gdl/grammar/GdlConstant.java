@@ -34,4 +34,14 @@ public final class GdlConstant extends GdlTerm
 		return value;
 	}
 
+	@Override
+	public String toASPString() {
+		return value;
+	}
+
+	@Override
+	public String infixString() {
+		return value;
+	}
+
 }

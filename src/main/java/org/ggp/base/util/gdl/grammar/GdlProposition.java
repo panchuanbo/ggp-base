@@ -45,6 +45,16 @@ public final class GdlProposition extends GdlSentence
 	}
 
 	@Override
+	public String infixString() {
+		return name.infixString();
+	}
+
+	@Override
+	public String toASPString() {
+		return name.toASPString() + "(T)";
+	}
+
+	@Override
 	public GdlTerm toTerm()
 	{
 		return name;

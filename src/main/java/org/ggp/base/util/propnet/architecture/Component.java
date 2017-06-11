@@ -32,16 +32,26 @@ public abstract class Component implements Serializable
     private boolean baseProposition = false;
     /** is input? */
     private boolean inputProposition = false;
+    /** is legal? */
+    private boolean legalProposition = false;
+    /** is goal? */
+    private boolean goalProposition = false;
 
     /** previous value */
     boolean previousValue = false;
 
-    public int componentId = 0;
+    public int componentId = Integer.MIN_VALUE;
+    public boolean connectedToTerminal = false;
+    public boolean toIgnore = false;
 
     public void setBase(boolean b) { this.baseProposition = b; }
     public void setInput(boolean b) { this.inputProposition = b; }
+    public void setLegal(boolean b) { this.legalProposition = b; }
+    public void setGoal(boolean b) { this.goalProposition = b; }
     public boolean isBase() { return this.baseProposition; }
     public boolean isInput() { return this.inputProposition; }
+    public boolean isLegal() { return this.legalProposition; }
+    public boolean isGoal() { return this.goalProposition; }
     public boolean previousValue() { return this.previousValue; }
     public void setPreviousValue(boolean b) { this.previousValue = b; }
     public int numberOfInputs() { return inputs.length; }

@@ -1,0 +1,54 @@
+role(robot).
+base(step(1)).
+base(step(2)).
+base(step(3)).
+base(step(4)).
+base(step(5)).
+base(step(6)).
+base(step(7)).
+index(1,T) :- time(T).
+index(2,T) :- time(T).
+index(3,T) :- time(T).
+index(4,T) :- time(T).
+index(5,T) :- time(T).
+index(6,T) :- time(T).
+index(7,T) :- time(T).
+index(8,T) :- time(T).
+index(9,T) :- time(T).
+true(step(1),1).
+successor(1,2,T) :- time(T).
+successor(2,3,T) :- time(T).
+successor(3,4,T) :- time(T).
+successor(4,5,T) :- time(T).
+successor(5,6,T) :- time(T).
+successor(6,7,T) :- time(T).
+base(p(VarX)) :- index(VarX,T), time(T).
+base(q(VarX)) :- index(VarX,T), time(T).
+base(r(VarX)) :- index(VarX,T), time(T).
+input(robot,a(VarX)) :- index(VarX,T), time(T).
+input(robot,b(VarX)) :- index(VarX,T), time(T).
+input(robot,c(VarX)) :- index(VarX,T), time(T).
+legal(robot,a(VarX),T) :- index(VarX,T), time(T).
+legal(robot,b(VarX),T) :- index(VarX,T), time(T).
+legal(robot,c(VarX),T) :- index(VarX,T), time(T).
+true(p(VarX),T+1) :- does(robot,a(VarX),T),not true(p(VarX),T), time(T).
+true(p(VarX),T+1) :- does(robot,b(VarX),T),true(q(VarX),T), time(T).
+true(p(VarX),T+1) :- true(p(VarX),T),not does(robot,a(VarX),T),not does(robot,b(VarX),T), time(T).
+true(q(VarX),T+1) :- does(robot,b(VarX),T),true(p(VarX),T), time(T).
+true(q(VarX),T+1) :- does(robot,c(VarX),T),true(r(VarX),T), time(T).
+true(q(VarX),T+1) :- true(q(VarX),T),not does(robot,b(VarX),T),not does(robot,c(VarX),T), time(T).
+true(r(VarX),T+1) :- does(robot,c(VarX),T),true(q(VarX),T), time(T).
+true(r(VarX),T+1) :- true(r(VarX),T),not does(robot,c(VarX),T), time(T).
+true(step(VarY),T+1) :- true(step(VarX),T),successor(VarX,VarY,T), time(T).
+goal(robot,100,T) :- row(VarX,T), time(T).
+goal(robot,0,T) :- not row(1,T),not row(2,T),not row(3,T),not row(4,T),not row(5,T),not row(6,T),not row(7,T),not row(8,T),not row(9,T), time(T).
+terminal(T) :- row(VarX,T), time(T).
+terminal(T) :- true(step(7),T), time(T).
+row(VarX,T) :- true(p(VarX),T),true(q(VarX),T),true(r(VarX),T), time(T).
+1 { does(R,M,T) : input(R,M) } 1 :- role(R), not terminated(T), time(T).
+terminated(T) :- terminal(T), time(T).
+terminated(T+1) :- terminated(T), time(T).
+:- does(R,M,T), not legal(R,M,T).
+:- 0 { terminated(T) : time(T) } 0.
+:- terminated(T), not terminated(T-1), role(R), not goal(R,100,T).
+time(1..7).

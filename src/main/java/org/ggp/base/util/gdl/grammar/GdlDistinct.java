@@ -42,4 +42,14 @@ public final class GdlDistinct extends GdlLiteral
 		return "( distinct " + arg1 + " " + arg2 + " )";
 	}
 
+	@Override
+	public String infixString() {
+		return "distinct(" + arg1.infixString() + "," + arg2.infixString() + ")";
+	}
+
+	@Override
+	public String toASPString() {
+		return "not " + arg1.toASPString() + "=" + arg2.toASPString();
+	}
+
 }

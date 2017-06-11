@@ -14,6 +14,7 @@ import org.ggp.base.util.gdl.grammar.GdlTerm;
 import org.ggp.base.util.propnet.architecture.Component;
 import org.ggp.base.util.propnet.architecture.PropNet;
 import org.ggp.base.util.propnet.architecture.components.And;
+import org.ggp.base.util.propnet.architecture.components.Constant;
 import org.ggp.base.util.propnet.architecture.components.Not;
 import org.ggp.base.util.propnet.architecture.components.Or;
 import org.ggp.base.util.propnet.architecture.components.Proposition;
@@ -30,13 +31,24 @@ import org.ggp.base.util.statemachine.implementation.prover.query.ProverQueryBui
 
 public class AnEvenBetterPropnetStateMachine extends StateMachine {
 
-	private int[] components;
-	private long[] componentInfo;
-	private int[] connectivity;
+	private int[] componentValues;
+	private int[] componentMetadata;
+	private int[] componentConnectivity;
+	private int inputOffset;
+	private int everythingElseOffset;
+
+	private int terminalID;
+	private int initID;
+	private int numberOfBaseProps;
+	private int numberOfInputProps;
+	private int numberOfPropositions;
+	private int notStart, notEnd;
+	private int[] baseToTransition;
+
 	private PropNet propnet;
 
 	private List<Role> roles;
-	private Proposition[] basePropositions;
+	private GdlSentence[] baseToSentence;
 	private Proposition[] inputPropositions;
 	private ArrayList<Map<GdlTerm, GdlSentence>> inputMap;
 	private Map<Role, Proposition[]> legalPropositions;
@@ -56,33 +68,110 @@ public class AnEvenBetterPropnetStateMachine extends StateMachine {
 		try {
 			this.propnet = OptimizingPropNetFactory.create(description);
 			this.roles = propnet.getRoles();
+			for (Component c : this.propnet.getComponents()) c.crystalize();
 
 			int numOutputs = 0, id = 0;
-			Set<Component> comps = this.propnet.getComponents();
-			for (Component c : comps) {
+			for (Component c : this.propnet.getBasePropositions().values()) {
 				numOutputs += c.numberOfOutputs();
 				c.componentId = id;
+//				System.out.println("Base: " + c.toString() + " | id: " + id);
 				id++;
 			}
-
-
-			components = new int[comps.size()];
-			componentInfo = new long[comps.size()];
-			connectivity = new int[numOutputs];
-
-			int outputloc = 0;
+			this.inputOffset = id;
+			for (Component c : this.propnet.getInputPropositions().values()) {
+				numOutputs += c.numberOfOutputs();
+				c.componentId = id;
+//				System.out.println("Input: " + c.toString() + " | id: " + id);
+				id++;
+			}
+			this.everythingElseOffset = id;
+			for (Proposition p : this.propnet.getPropositions()) {
+				if (p.componentId == Integer.MIN_VALUE) {
+					numOutputs += p.numberOfOutputs();
+					p.componentId = id;
+					id++;
+				}
+			}
+			Set<Component> comps = this.propnet.getComponents();
+			this.notStart = id;
 			for (Component c : comps) {
-
+				if ((c instanceof Not)) {
+					if (c.componentId == Integer.MIN_VALUE) {
+						numOutputs += c.numberOfOutputs();
+						c.componentId = id;
+						id++;
+					}
+				}
+			}
+			this.notEnd = id;
+			for (Component c : comps) {
+				if (c.componentId == Integer.MIN_VALUE) {
+					numOutputs += c.numberOfOutputs();
+					c.componentId = id;
+					id++;
+				}
 			}
 
-			this.basePropositions = new Proposition[this.propnet.getBasePropositions().size()];
-			this.inputPropositions = new Proposition[this.propnet.getInputPropositions().size()];
+			this.numberOfBaseProps = this.propnet.getBasePropositions().size();
+			this.numberOfInputProps = this.propnet.getInputPropositions().size();
+			this.numberOfPropositions = this.propnet.getPropositions().size();
+			System.out.println("Number of Base Props: " + this.propnet.getBasePropositions().size());
+			System.out.println("Number of Input Props: " + this.propnet.getInputPropositions().size());
+
+			this.terminalID = this.propnet.getTerminalProposition().componentId;
+			if (this.propnet.getInitProposition() != null) {
+				this.initID = this.propnet.getInitProposition().componentId;
+			} else {
+				this.initID = -1;
+			}
+
+			System.out.println("Number of Propositions: " + this.numberOfPropositions);
+			System.out.println("Terminal Proposition Component ID: " + this.terminalID);
+			System.out.println("Input Proposition Component ID: " + this.initID);
+
+			componentValues = new int[comps.size()]; 			// holds the number
+			componentMetadata = new int[comps.size()];			// holds #outputs + output offset
+			componentConnectivity = new int[numOutputs];		// holds list of outputs
+			int outputloc = 0;
+			for (Component c : comps) {
+				if ((c instanceof Or)) componentValues[c.componentId] = 0x7FFFFFFF;
+				else if ((c instanceof And)) componentValues[c.componentId] = 0x80000000 - c.numberOfInputs();
+				else if ((c instanceof Not)) componentValues[c.componentId] = 0;
+				else if ((c instanceof Constant)) {
+					System.out.println("we have constants :O");
+
+					componentValues[c.componentId] = (c.getValue()) ? 0 : -1;//0xFFFFFFFF : 0;
+				}
+				else componentValues[c.componentId] = 0x7FFFFFFF;
+				componentMetadata[c.componentId] = (c.numberOfOutputs() << 16) + (outputloc);
+
+
+
+				int num_loc = this.componentMetadata[c.componentId];
+				int result_num = (num_loc & 0xFFFF0000) >>> 16;
+				int result_loc = (num_loc & 0xFFFF);
+				assert(result_num == c.numberOfOutputs());
+				assert(result_loc == outputloc);
+
+				for (Component o : c.getOutputs()) {
+					if ((o instanceof Transition)) componentConnectivity[outputloc] = -o.componentId;
+					else componentConnectivity[outputloc] = o.componentId;
+					outputloc++;
+				}
+			}
+
+			System.out.println("Num Outputs: " + numOutputs);
+			System.out.println("Output Loc: " + outputloc);
+
+			this.baseToTransition = new int[this.numberOfBaseProps];
+			this.baseToSentence = new GdlSentence[this.numberOfBaseProps];
+			this.inputPropositions = new Proposition[this.numberOfInputProps];
 			this.legalPropositions = new HashMap<>();
 
 			List<Proposition> bases = new ArrayList<Proposition>(this.propnet.getBasePropositions().values());
-			for (int i = 0; i < this.basePropositions.length; i++) {
-				this.basePropositions[i] = bases.get(i);
-				this.basePropositions[i].setBase(true);
+			for (int i = 0; i < this.numberOfBaseProps; i++) {
+				this.baseToTransition[bases.get(i).componentId] = bases.get(i).fasterGetSingleInput().componentId;
+				this.baseToSentence[bases.get(i).componentId] = bases.get(i).getName();
 			}
 
 			List<Proposition> inputs = new ArrayList<Proposition>(this.propnet.getInputPropositions().values());
@@ -121,28 +210,30 @@ public class AnEvenBetterPropnetStateMachine extends StateMachine {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		System.out.println("Finished Initializing StateMachine");
 	}
 
 	@Override
 	public int getGoal(MachineState state, Role role) throws GoalDefinitionException {
-		this.markbases(state);
-		for (Component c : this.basePropositions) forwardprop(c);
+		BitSet b = state.getPropContents();
+		for (int i = 0; i < this.numberOfBaseProps; i++) forwardprop_wrapper(i, b.get(i));
 		Set<Proposition> goalProps = this.propnet.getGoalPropositions().get(role);
 		for (Proposition p : goalProps) {
-			if (p.getValue()) return this.getGoalValue(p);
+			if (this.componentValues[p.componentId] < 0) {
+//				System.out.println("ayy... I found a goal :)");
+				return this.getGoalValue(p);
+			}
 		}
 		return 0;
 	}
 
 	@Override
 	public boolean isTerminal(MachineState state) {
-		this.markbases(state);
-		for (Component c : this.basePropositions) forwardprop(c);
-		for (Component c : this.propnet.getTerminalProposition().fasterGetInputs()) {
-			if (!c.getValue()) return false;
+		BitSet b = state.getPropContents();
+		for (int i = 0; i < this.numberOfBaseProps; i++) {
+			forwardprop_wrapper(i, b.get(i));
 		}
-
-		return true;
+		return (this.componentValues[this.terminalID] < 0);
 	}
 
 	@Override
@@ -152,40 +243,40 @@ public class AnEvenBetterPropnetStateMachine extends StateMachine {
 
 	@Override
 	public MachineState getInitialState() {
-		this.propnet.getInitProposition().setValue(true);
 		for (Component c : this.propnet.getComponents()) { // check what subclass of component
 			if ((c instanceof And)) ((And) c).useFastMethod = true;
 			if ((c instanceof Or)) ((Or) c).useFastMethod = true;
 			if ((c instanceof Transition)) ((Transition) c).useFastMode = true;
-			c.setPreviousValue(false);
 		}
-		for (Component c : this.propnet.getComponents()) if ((c instanceof Not)) forwardprop(c);
-		forwardprop(this.propnet.getInitProposition());
+		if (this.initID != -1) this.propnet.getInitProposition().setValue(true);
+		for (Component c : this.propnet.getComponents()) {
+			if ((c instanceof Constant)) forwardprop_wrapper(c.componentId, c.getValue());
+			else if ((c instanceof Not)) forwardprop_wrapper(c.componentId, c.getValue());
+		}
+		if (this.initID != -1) forwardprop_wrapper(this.initID, true);
 
 		Set<GdlSentence> state = new HashSet<GdlSentence>();
-		BitSet activeStates = new BitSet(this.basePropositions.length);
-		for (int i = 0; i < this.basePropositions.length; i++) {
-			boolean val = this.basePropositions[i].fasterGetSingleInput().getValue();
-			activeStates.set(i, val);
-			if (val) {
-				state.add(this.basePropositions[i].getName());
-			}
+		BitSet activeStates = new BitSet(this.numberOfBaseProps);
+		for (int id = 0; id < this.numberOfBaseProps; id++) {
+			boolean val = this.componentValues[this.baseToTransition[id]] < 0;
+			activeStates.set(id, val);
+			if (val) state.add(this.baseToSentence[id]);
 		}
+
 		System.out.println("INITIAL STATE VALUES: " + state);
-		this.propnet.getInitProposition().setValue(false);
-		forwardprop(this.propnet.getInitProposition());
+		if (this.initID != -1) forwardprop_wrapper(this.initID, false);
+		if (this.initID != -1) this.propnet.getInitProposition().setValue(true);
 		return new MachineState(state, activeStates);
 	}
 
 	@Override
 	public List<Move> getLegalMoves(MachineState state, Role role) throws MoveDefinitionException {
-		this.markbases(state);
-		for (Component c : this.basePropositions) forwardprop(c);
-//		for (Component c : this.propnet.getComponents()) c.setPreviousValue(c.getValue());
+		BitSet b = state.getPropContents();
+		for (int i = 0; i < this.numberOfBaseProps; i++) forwardprop_wrapper(i, b.get(i));
 		Proposition[] legalProps = this.legalPropositions.get(role);
 		ArrayList<Move> moves = new ArrayList<Move>();
 		for (Proposition p : legalProps) {
-			if (p.getValue()) moves.add(this.getMoveFromProposition(p));
+			if ((this.componentValues[p.componentId] < 0)) moves.add(this.getMoveFromProposition(p));
 		}
 //		System.out.println("Legal Moves: " + moves);
 		return moves;
@@ -193,65 +284,102 @@ public class AnEvenBetterPropnetStateMachine extends StateMachine {
 
 	@Override
 	public MachineState getNextState(MachineState state, List<Move> moves) throws TransitionDefinitionException {
-		this.markactions(moves);
-		this.markbases(state);
-		for (Component c : this.basePropositions) forwardprop(c);
-		for (Component c : this.inputPropositions) forwardprop(c);
+//		System.out.println("HERE WE GO");
+		BitSet b = state.getPropContents(), in = this.markactions(moves);
+//		System.out.println("---");
+		for (int i = 0; i < this.numberOfBaseProps; i++) {
+//			if (b.get(i)) System.out.println("BASE ON: " + i);
+			forwardprop_wrapper(i, b.get(i));
+		}
+		for (int i = this.inputOffset; i < this.inputOffset + this.numberOfInputProps; i++) {
+//			if (in.get(i)) System.out.println("INPUT ON: " + i);
+			forwardprop_wrapper(i, in.get(i));
+		}
 //		for (Component c : this.propnet.getComponents()) c.setPreviousValue(c.getValue());
 
 		Set<GdlSentence> gdlState = new HashSet<GdlSentence>();
-		BitSet activeStates = new BitSet(this.basePropositions.length);
-		for (int i = 0; i < this.basePropositions.length; i++) {
-			boolean val = this.basePropositions[i].fasterGetSingleInput().getValue();
-			activeStates.set(i, val);
-			if (val) {
-				gdlState.add(this.basePropositions[i].getName());
-			}
+		BitSet activeStates = new BitSet(this.numberOfBaseProps);
+		for (int id = 0; id < this.numberOfBaseProps; id++) {
+			boolean val = this.componentValues[this.baseToTransition[id]] < 0;
+			activeStates.set(id, val);
+			if (val) gdlState.add(this.baseToSentence[id]);
 		}
 //		System.out.println("NEXT STATE VALUES: " + gdlState);
 
-		return new MachineState(gdlState, activeStates);
+		MachineState nextState = new MachineState(gdlState, activeStates);
+
+//		System.out.println("" + state + " + " + moves + " = " + nextState);
+//		System.out.println("---");
+
+		return nextState;
 	}
 
 	// ----------------------------------------------
 
-	private void forwardprop(Component c) {
-		boolean c_val = c.getValue();
-		if (c_val == c.previousValue()) return;
-		c.setPreviousValue(c_val);
-		if ((c instanceof Transition)) return;
-		for (Component o : c.fasterGetOutputs()) {
-			if ((o instanceof Proposition)) {
-				o.setPreviousValue(o.getValue());
-				((Proposition) o).setValue(c_val);
-			}
-			else if ((o instanceof And)) ((And) o).counter += (c_val) ? 1 : -1;
-			else if ((o instanceof Or)) ((Or) o).counter += (c_val) ? 1 : -1;
-			else if ((o instanceof Transition)) {
-				o.setPreviousValue(o.getValue());
-				((Transition) o).setValue(c_val);
-			}
-			forwardprop(o);
+	private void forwardprop_wrapper(int componentid, boolean b) {
+		if (b) forwardprop(componentid, 0xFFFFFFFF);
+		else forwardprop(componentid, 0);
+//		if (b) forwardprop(componentid, 0x80000000);
+//		else forwardprop(componentid, 0x7FFFFFFF);
+	}
+
+//	private void forwardprop(Component c) {
+//		boolean c_val = c.getValue();
+//		if (c_val == c.previousValue()) return;
+//		c.setPreviousValue(c_val);
+//		if ((c instanceof Transition)) return;
+//		for (Component o : c.fasterGetOutputs()) {
+//			if ((o instanceof Proposition)) {
+//				o.setPreviousValue(o.getValue());
+//				((Proposition) o).setValue(c_val);
+//			}
+//			else if ((o instanceof And)) ((And) o).counter += (c_val) ? 1 : -1;
+//			else if ((o instanceof Or)) ((Or) o).counter += (c_val) ? 1 : -1;
+//			else if ((o instanceof Transition)) {
+//				o.setPreviousValue(o.getValue());
+//				((Transition) o).setValue(c_val);
+//			}
+//			forwardprop(o);
+//		}
+//	}
+
+	private void forwardprop(int componentid, int currentValue) {
+		boolean c_val = (currentValue < 0);
+//		if (componentid == this.terminalID) {
+//			System.out.println("Prop to Terminal ID with new_val: " + c_val);
+//		}
+		if (componentid < 0) { // transition
+			this.componentValues[-componentid] = currentValue;
+			return;
+		}
+		boolean prevValue = (this.componentValues[componentid] < 0);
+		boolean isNot = (componentid >= this.notStart && componentid < this.notEnd);
+		if (isNot) {
+			if (prevValue == c_val) return;
+			this.componentValues[componentid] = currentValue;
+		} else {
+			this.componentValues[componentid] = currentValue;
+			if (prevValue == c_val) return;
+		}
+		int num_loc = this.componentMetadata[componentid];
+		int num = num_loc >>> 16;//(num_loc & 0xFFFF0000) >>> 16;
+		int loc = (num_loc & 0xFFFF);
+		for (int i = loc; i < num + loc; i++) {
+			int c = this.componentConnectivity[i], value = 0;
+			if (c < this.numberOfPropositions) value = currentValue;
+			else value = this.componentValues[c] + ((c_val) ? 1 : -1);
+			forwardprop(c, value);
 		}
 	}
 
-	private void markbases(MachineState s) {
-		BitSet activeBits = s.getPropContents();
-		for (int i = 0; i < this.basePropositions.length; i++) {
-			this.basePropositions[i].setPreviousValue(this.basePropositions[i].getValue());
-			this.basePropositions[i].setValue(activeBits.get(i));
-		}
-	}
-
-	private void markactions(List<Move> moves) {
-		for (Proposition p : this.inputPropositions) {
-			p.setPreviousValue(p.getValue());
-			p.setValue(false);
-		}
+	private BitSet markactions(List<Move> moves) {
+		BitSet b = new BitSet(this.numberOfBaseProps + this.numberOfInputProps);
 		GdlSentence[] gdlMoves = toDoes(moves);
 		for (GdlSentence m : gdlMoves) {
-			this.propnet.getInputPropositions().get(m).setValue(true);
+			int id = this.propnet.getInputPropositions().get(m).componentId;
+			b.set(id);
 		}
+		return b;
 	}
 
     private GdlSentence[] toDoes(List<Move> moves) {

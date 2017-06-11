@@ -246,6 +246,7 @@ public class OptimizingPropNetFactory {
 			System.out.println("Propnet has " +propnet.getNumAnds()+" ands; "+propnet.getNumOrs()+" ors; "+propnet.getNumNots()+" nots");
 		}
 		//System.out.println("...done");
+		propnet.processedGameDescription = description;
 		return propnet;
 	}
 

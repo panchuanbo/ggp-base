@@ -157,8 +157,14 @@ public abstract class StateMachineGamer extends Gamer
      * arrives at a particular game state.
      */
 	public final void resetStateFromMatch() {
-        stateMachine = getInitialStateMachine();
-        stateMachine.initialize(getMatch().getGame().getRules());
+		stateMachine = getInitialStateMachine();
+		try {
+			stateMachine.initialize(getMatch().getGame().getRules());
+		} catch (Exception e) {
+			System.out.println("[StateMachineGamer] Can't Initialize Propnet --> Switching to Prover");
+			stateMachine = new CachedStateMachine(new ProverStateMachine());
+			stateMachine.initialize(getMatch().getGame().getRules());
+		}
         currentState = stateMachine.getMachineStateFromSentenceList(getMatch().getMostRecentState());
         role = stateMachine.getRoleFromConstant(getRoleName());
 	}
@@ -181,7 +187,13 @@ public abstract class StateMachineGamer extends Gamer
 		try
 		{
 			stateMachine = getInitialStateMachine();
-			stateMachine.initialize(getMatch().getGame().getRules());
+			try {
+				stateMachine.initialize(getMatch().getGame().getRules());
+			} catch (Exception e) {
+				System.out.println("[StateMachineGamer] Can't Initialize Propnet --> Switching to Prover");
+				stateMachine = new CachedStateMachine(new ProverStateMachine());
+				stateMachine.initialize(getMatch().getGame().getRules());
+			}
 			currentState = stateMachine.getInitialState();
 
 			role = stateMachine.getRoleFromConstant(getRoleName());

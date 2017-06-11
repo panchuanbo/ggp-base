@@ -43,6 +43,19 @@ public class MachineState {
     	this.activeBits = activeBits;
     }
 
+    /**
+     * Have an idea...
+     * @return
+     */
+    public boolean[] active;
+    private int numBits = -1;
+    public MachineState(int bits) {
+    	this.contents = null;
+    	this.activeBits = null;
+    	this.numBits = bits;
+    	active = new boolean[bits];
+    }
+
     public BitSet getPropContents() {
     	return activeBits;
     }
@@ -73,11 +86,13 @@ public class MachineState {
     @Override
     public boolean equals(Object o)
     {
-        if ((o != null) && (o instanceof MachineState))
-        {
+    	if ((o != null) && (o instanceof MachineState)) {
             MachineState state = (MachineState) o;
+            if (state.numBits != -1) {
+            	return state.active.equals(this.active);
+            }
             return state.getContents().equals(getContents());
-        }
+    	}
 
         return false;
     }

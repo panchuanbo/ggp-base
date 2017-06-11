@@ -35,4 +35,13 @@ public final class GdlNot extends GdlLiteral
 		return "( not " + body + " )";
 	}
 
+	@Override
+	public String infixString() {
+		return "~" + body.infixString();
+	}
+
+	@Override
+	public String toASPString() {
+		return "not " + body.toASPString();
+	}
 }

@@ -12,6 +12,10 @@ public abstract class Gdl implements Serializable
 	@Override
 	public abstract String toString();
 
+	public abstract String infixString();
+
+	public abstract String toASPString();
+
 	/**
 	 * This method is used by deserialization to ensure that Gdl objects
 	 * loaded from an ObjectInputStream or a remote method invocation

@@ -34,4 +34,13 @@ public final class GdlVariable extends GdlTerm
 		return name;
 	}
 
+	@Override
+	public String infixString() {
+		return name;
+	}
+
+	@Override
+	public String toASPString() {
+		return name;
+	}
 }
